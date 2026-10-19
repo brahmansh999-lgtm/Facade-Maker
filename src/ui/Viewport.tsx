@@ -31,7 +31,7 @@ export function currentSheet(d: Derived, ui: UIState): CurrentSheet {
 }
 
 const TABS: { v: ViewKind; label: string; key: string }[] = [
-  { v: 'elev', label: 'ELEVATIONS', key: 'E' }, { v: 'axo', label: 'AXO', key: 'A' }, { v: 'plan', label: 'PLANS', key: 'P' },
+  { v: 'axo', label: '3D AXO', key: 'A' }, { v: 'plan', label: 'PLANS', key: 'P' }, { v: 'elev', label: 'ELEVATIONS', key: 'E' },
   { v: 'section', label: 'SECTION', key: 'S' }, { v: 'schedule', label: 'SCHEDULE', key: 'R' },
 ];
 

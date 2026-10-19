@@ -67,7 +67,7 @@ export const useStore = create<Store>((set, get) => ({
   future: [],
   lastMerge: null,
   ui: {
-    view: 'elev', elevSide: 'front', planLevel: 0, compare: false, compareIds: ['jaali', 'fins', 'louvres'],
+    view: 'axo', elevSide: 'front', planLevel: 0, compare: false, compareIds: ['jaali', 'fins', 'louvres'],
     selRooms: [], selOpening: null, tool: 'select', scope: 'all', briefOpen: false, status: '', fitNonce: 0, sheetNonce: 0, trueScaleNonce: 0,
     ...initialView(),
   },
