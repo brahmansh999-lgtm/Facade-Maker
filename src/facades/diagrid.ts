@@ -6,7 +6,7 @@ import { mix } from '../drawings/color.ts';
 
 export const diagrid: FacadeType = {
   id: 'diagrid',
-  num: 6,
+  num: 11,
   name: 'Diagrid exoskeleton',
   description: 'A steel diagrid standing proud of the envelope, its nodes landing on every slab band. Members are clash-checked against openings and simply stop at doors; tinted glass infills only fill triangles clear of the windows.',
   params: [

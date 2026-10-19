@@ -8,7 +8,7 @@ const T = 0.024;
 
 export const dichroic: FacadeType = {
   id: 'dichroic',
-  num: 10,
+  num: 7,
   name: 'Dichroic glass fins',
   description: 'Laminated dichroic glass blades in stainless shoes at every slab band. Colour shifts across the face and with viewing angle; the blades twist from end to end. Fins straighten or drop out in front of windows to keep the free area.',
   params: [

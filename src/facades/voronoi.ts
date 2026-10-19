@@ -3,9 +3,9 @@ import { Ctx, def, sz } from './kit.ts';
 import { barHitsRect } from '../drawings/primDraw.ts';
 import { overlap } from '../geometry/rect.ts';
 import { rng } from '../model/units.ts';
-import { shade } from '../drawings/color.ts';
+import { mix, shade } from '../drawings/color.ts';
 
-type P2 = [number, number];
+export type P2 = [number, number];
 
 /** keep the part of a convex polygon on the near side of the bisector between seeds a and b */
 function clipBisector(poly: P2[], a: P2, b: P2): P2[] {
@@ -23,7 +23,7 @@ function clipBisector(poly: P2[], a: P2, b: P2): P2[] {
 }
 
 /** inset a convex CCW polygon by g (offset every edge inward, intersect neighbours); null if it collapses */
-function inset(poly: P2[], g: number): P2[] | null {
+export function inset(poly: P2[], g: number): P2[] | null {
   const n = poly.length;
   const lines = poly.map((p, i) => {
     const q = poly[(i + 1) % n];
@@ -42,12 +42,98 @@ function inset(poly: P2[], g: number): P2[] | null {
   return area(out) > 0.02 && area(out) < area(poly) ? out : null;
 }
 
-const area = (poly: P2[]) => {
+export const area = (poly: P2[]) => {
   let a = 0;
   for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += p[0] * q[1] - q[0] * p[1]; }
   return a / 2;
 };
-const centroid = (poly: P2[]): P2 => [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
+export const centroid = (poly: P2[]): P2 => [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
+
+
+/**
+ * Voronoi cells over a face. Every opening gets its own seed with a reserved disc, so each window
+ * or door sits inside one cell; the other seeds are Poisson darts whose spacing follows `field`.
+ */
+export function voronoiCells(c: Ctx, S: number, field: string, rnd: () => number): P2[][] {
+  const x0 = 0, x1 = c.width, y0 = c.bottom, y1 = c.top;
+  const seeds: { p: P2; r: number }[] = [];
+  for (const o of c.openings) {
+    const r = Math.hypot(o.u1 - o.u0, (o.door ? o.z1 - c.bottom : o.z1 - o.z0)) / 2 + 0.12;
+    seeds.push({ p: [(o.u0 + o.u1) / 2, o.door ? (c.bottom + o.z1) / 2 : (o.z0 + o.z1) / 2], r });
+  }
+  const spacing = (p: P2) => {
+    const t = (p[1] - y0) / (y1 - y0);
+    if (field === 'rising') return S * (1.1 - 0.3 * t);
+    if (field === 'openings') {
+      const dn = Math.min(...c.openings.map((o) => Math.hypot(Math.max(o.u0 - p[0], 0, p[0] - o.u1), Math.max(o.z0 - p[1], 0, p[1] - o.z1))), 9);
+      return S * (0.6 + 0.5 * Math.min(1, dn / 2.5));
+    }
+    if (field === 'diagonal') return S * (0.65 + 0.6 * ((p[0] - x0) / Math.max(1, x1 - x0) * 0.5 + t * 0.5));
+    return S;
+  };
+  const tries = Math.ceil(((x1 - x0) * (y1 - y0)) / (S * S * 0.25)) * 30;
+  for (let k = 0; k < tries; k++) {
+    const p: P2 = [x0 + rnd() * (x1 - x0), y0 + rnd() * (y1 - y0)];
+    const sp = spacing(p) * 0.82;
+    if (seeds.some((s, i) => Math.hypot(s.p[0] - p[0], s.p[1] - p[1]) < (i < c.openings.length ? 2 * s.r : sp))) continue;
+    seeds.push({ p, r: sp });
+  }
+  const cells: P2[][] = [];
+  for (let i = 0; i < seeds.length; i++) {
+    let poly: P2[] = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    for (let j = 0; j < seeds.length && poly.length; j++) if (j !== i) poly = clipBisector(poly, seeds[i].p, seeds[j].p);
+    if (poly.length >= 3) cells.push(poly);
+  }
+  return cells;
+}
+
+/** keep the part of a convex polygon where a·u + b·z ≤ k */
+function clipHalf(poly: P2[], a: number, b: number, k: number): P2[] {
+  const out: P2[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    const fp = a * p[0] + b * p[1] - k, fq = a * q[0] + b * q[1] - k;
+    if (fp <= 0) out.push(p);
+    if (fp * fq < 0) { const t = fp / (fp - fq); out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]); }
+  }
+  return out;
+}
+
+/** convex pieces of a convex polygon that stay clear of every rect (left, right, below, above each one) */
+export function cutAround(poly: P2[], rects: { x0: number; x1: number; y0: number; y1: number }[]): P2[][] {
+  let pieces = [poly];
+  for (const r of rects) {
+    pieces = pieces.flatMap((pc) => {
+      const us = pc.map((q) => q[0]), zs = pc.map((q) => q[1]);
+      if (Math.max(...us) <= r.x0 || Math.min(...us) >= r.x1 || Math.max(...zs) <= r.y0 || Math.min(...zs) >= r.y1) return [pc];
+      const mid = clipHalf(clipHalf(pc, -1, 0, -r.x0), 1, 0, r.x1);
+      // left of, right of, below and above the rect
+      return [clipHalf(pc, 1, 0, r.x0), clipHalf(pc, -1, 0, -r.x1), clipHalf(mid, 0, 1, r.y0), clipHalf(mid, 0, -1, -r.y1)];
+    });
+  }
+  return pieces.filter((q) => q.length >= 3 && area(q) > 0.04);
+}
+
+/** every Voronoi edge once */
+export function uniqueEdges(cells: P2[][]): [P2, P2][] {
+  const seen = new Set<string>(), out: [P2, P2][] = [];
+  const key = (p: P2) => `${Math.round(p[0] * 200)},${Math.round(p[1] * 200)}`;
+  for (const poly of cells) for (let k = 0; k < poly.length; k++) {
+    const a = poly[k], b = poly[(k + 1) % poly.length];
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
+    const ka = key(a), kb = key(b), kk = ka < kb ? ka + kb : kb + ka;
+    if (seen.has(kk)) continue;
+    seen.add(kk);
+    out.push([a, b]);
+  }
+  return out;
+}
+
+/** colour along a three-stop ramp primary → secondary → accent */
+export function ramp(p: { primary: string; secondary: string; accent: string }, t: number): string {
+  const u = Math.max(0, Math.min(1, t));
+  return u < 0.5 ? mix(p.primary, p.secondary, u * 2) : mix(p.secondary, p.accent, (u - 0.5) * 2);
+}
 
 export const voronoi: FacadeType = {
   id: 'voronoi',
@@ -77,45 +163,14 @@ export const voronoi: FacadeType = {
     const off = c.m('offset');
     const voids = c.pct('voids');
     const rnd = rng(17 + Math.round(face.width * 31));
-    const x0 = 0, x1 = c.width, y0 = c.bottom, y1 = c.top;
     const opens = [...c.openRects(0.06), ...c.doorRects(0.08)];
 
-    // seeds: one per opening, then Poisson-disc darts whose spacing follows the field
-    const seeds: { p: P2; r: number }[] = [];
-    for (const o of c.openings) {
-      const r = Math.hypot(o.u1 - o.u0, (o.door ? o.z1 - c.bottom : o.z1 - o.z0)) / 2 + 0.12;
-      seeds.push({ p: [(o.u0 + o.u1) / 2, o.door ? (c.bottom + o.z1) / 2 : (o.z0 + o.z1) / 2], r });
-    }
-    const spacing = (p: P2) => {
-      const t = (p[1] - y0) / (y1 - y0);
-      if (field === 'rising') return S * (1.1 - 0.3 * t);
-      if (field === 'openings') {
-        const dn = Math.min(...c.openings.map((o) => Math.hypot(Math.max(o.u0 - p[0], 0, p[0] - o.u1), Math.max(o.z0 - p[1], 0, p[1] - o.z1))), 9);
-        return S * (0.6 + 0.5 * Math.min(1, dn / 2.5));
-      }
-      return S;
-    };
-    const tries = Math.ceil(((x1 - x0) * (y1 - y0)) / (S * S * 0.25)) * 30;
-    for (let k = 0; k < tries; k++) {
-      const p: P2 = [x0 + rnd() * (x1 - x0), y0 + rnd() * (y1 - y0)];
-      const sp = spacing(p) * 0.82;
-      // keep darts outside every opening's reserved disc (2r) so that seed's cell contains the opening
-      if (seeds.some((s, i) => Math.hypot(s.p[0] - p[0], s.p[1] - p[1]) < (i < c.openings.length ? 2 * s.r : sp))) continue;
-      seeds.push({ p, r: sp });
-    }
-
-    // cells
-    const frame: P2[][] = [];
-    const panels: { poly: P2[]; open: boolean }[] = [];
-    for (let i = 0; i < seeds.length; i++) {
-      let poly: P2[] = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-      for (let j = 0; j < seeds.length && poly.length; j++) if (j !== i) poly = clipBisector(poly, seeds[i].p, seeds[j].p);
-      if (poly.length < 3) continue;
-      frame.push(poly);
+    const cells = voronoiCells(c, S, field, rnd);
+    const frame = cells;
+    const panels = cells.map((poly) => {
       const bb = { x0: Math.min(...poly.map((q) => q[0])), x1: Math.max(...poly.map((q) => q[0])), y0: Math.min(...poly.map((q) => q[1])), y1: Math.max(...poly.map((q) => q[1])) };
-      const hasOpening = opens.some((o) => overlap(o, bb) > 0);
-      panels.push({ poly, open: hasOpening || rnd() < voids });
-    }
+      return { poly, open: opens.some((o) => overlap(o, bb) > 0) || rnd() < voids };
+    });
 
     // cushioned panels: a shallow pyramid fanned from the centroid
     let nPanels = 0, panelArea = 0;
@@ -160,7 +215,7 @@ export const voronoi: FacadeType = {
     c.row('Voronoi panel, cushioned', `≈ ${Math.round(S * 1000)} cell, rise ≤ ${Math.round(bulge * 1000)}`, palette.name, nPanels, 0);
     c.row('Panel area', '12 mm solid surface / 3 mm Al', palette.name, 1, panelArea, 'm²');
     c.row('Joint frame', sz(g, 0.09), 'Aluminium extrusion', len, 0, 'm');
-    c.notes.push(`${seeds.length} cells (${panels.filter((p) => p.open).length} open around ${c.openings.length} openings), ${members} frame members.`);
+    c.notes.push(`${cells.length} cells (${panels.filter((p) => p.open).length} open around ${c.openings.length} openings), ${members} frame members.`);
     return c.finish();
   },
 };

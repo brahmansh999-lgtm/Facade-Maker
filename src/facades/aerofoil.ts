@@ -6,7 +6,7 @@ const POST = 0.07;
 
 export const aerofoil: FacadeType = {
   id: 'aerofoil',
-  num: 5,
+  num: 10,
   name: 'Aerofoil aluminium louvres',
   description: 'Extruded aluminium aerofoil blades spanning between slim mullions on the grid. Blade chord follows the sun cut-off: depth = pitch / tan(cut-off). With climate response on, the cut-off is this face’s vertical shadow angle at peak exposure.',
   params: [

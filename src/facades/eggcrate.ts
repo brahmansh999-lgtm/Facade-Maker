@@ -4,7 +4,7 @@ import { subtract1D } from '../geometry/rect.ts';
 
 export const eggcrate: FacadeType = {
   id: 'eggcrate',
-  num: 13,
+  num: 14,
   name: 'UHPC brise-soleil grid',
   description: 'Thin-section ultra-high-performance concrete grid standing off the envelope: verticals subdivide each structural bay, horizontals sit on every slab band. Deep, crisp cells shade high and low sun; open area is checked against the windows behind.',
   params: [

@@ -6,7 +6,7 @@ const TILE = 0.6;
 
 export const perforated: FacadeType = {
   id: 'perforated',
-  num: 7,
+  num: 12,
   name: 'Parametric perforated skin',
   description: '3 mm aluminium panels CNC-punched from a density field, hung on a rail sub-frame off the slab bands. Holes swell in front of windows until each tile passes the room’s required free area; doors stay clear.',
   params: [

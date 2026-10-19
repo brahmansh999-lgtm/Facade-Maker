@@ -5,7 +5,7 @@ import { lerp } from '../model/units.ts';
 
 export const fins: FacadeType = {
   id: 'fins',
-  num: 4,
+  num: 9,
   name: 'Twisting aluminium fins',
   description: 'Extruded aluminium blade fins on rails at every slab band. Fins land on each grid line and subdivide the bays; their angle twists across the face, leaning toward the low sun on exposed elevations. In front of glazing a fin straightens or drops out to keep the free area.',
   params: [

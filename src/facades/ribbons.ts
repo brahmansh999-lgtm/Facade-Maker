@@ -6,7 +6,7 @@ const SEG = 0.3;
 
 export const ribbons: FacadeType = {
   id: 'ribbons',
-  num: 3,
+  num: 8,
   name: 'Wave ribbons',
   description: 'Horizontal aluminium ribbons on CNC-cut fins, each one rippling in and out from the wall as a travelling wave. Ribbon pitch opens up in front of windows; ribbons stop short of doors.',
   params: [

@@ -30,7 +30,7 @@ function clipRect(poly: P2[], x0: number, x1: number, y0: number, y1: number): P
 
 export const hex: FacadeType = {
   id: 'hex',
-  num: 9,
+  num: 13,
   name: 'Faceted hex tiles',
   description: 'Pressed-metal hexagonal pyramids clipped to a dark backing skin. Peak height follows a parametric field, so the facade catches light differently across the day. Tiles step back around every opening, leaving a crisp pixel frame to the glass.',
   params: [
