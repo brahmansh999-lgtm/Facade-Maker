@@ -19,7 +19,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 
 ### 3. Elevations
 - All four elevations, fully dimensioned, with floor levels and the structural grid.
-- 15 facade systems: jaali brick screen, timber fins, precast louvres, concrete egg-crate, exposed brick, fluted GRC, perforated weathering steel, lime render, double skin with mesh, terracotta baguettes, folded metal, stone cladding, timber shutters, green facade and ribbed cast stone.
+- 15 modern facade systems: kinetic pixel skin, twisting aluminium fins, aerofoil louvres, diagrid exoskeleton, parametric perforated skin, double skin with mesh, faceted hex tiles, kinetic triangular panels, dichroic glass fins, wave ribbons, folded metal, fluted white GRC, UHPC brise-soleil grid, ribbed UHPC and a vertical garden net.
 - Each facade has 4–7 adjustable settings in real units, 3 material palettes, and can be set differently for each elevation.
 - Facades respond to the sun: denser and deeper on the hot faces, lighter on the north, using the site's latitude.
 - Facades never block a door, and any screen in front of a window lets through enough air for the room behind it.
@@ -30,6 +30,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 - Schedules of facade components, windows and doors, rooms and stair data.
 - A live warnings list that checks room sizes, daylight, ventilation, stair rules, structural spans, setbacks and stacked bathrooms.
 - Every drawing on an A3 sheet with a title block; export as SVG or print to PDF.
+- Works on phones: single-column layout, swipeable facade strip, pinch-zoom on drawings, touch-sized edit handles.
 - Save and open projects as JSON; undo and redo; autosave in the browser.
 
 ## Run it

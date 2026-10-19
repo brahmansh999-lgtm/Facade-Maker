@@ -11,5 +11,5 @@ if (which === 'acceptance') p = relayout(p, { brief: { bedrooms: 4, floors: 3 } 
 if (process.argv[3]) p.facade.activeTypeId = process.argv[3];
 const d = derive(p);
 for (const s of sheetList(d)) writeFileSync(`shots/${which}-${s.id}.svg`, renderSheet(d, s.id));
-writeFileSync(`shots/${which}-compare.svg`, renderCompare(d, 'front', ['jaali', 'fins', 'louvres', 'stone']));
+writeFileSync(`shots/${which}-compare.svg`, renderCompare(d, 'front', ['pixels', 'diagrid', 'hex', 'ribbons']));
 console.log('written', sheetList(d).length + 1);

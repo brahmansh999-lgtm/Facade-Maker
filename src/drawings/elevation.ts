@@ -12,7 +12,7 @@ import { View, W, type Painter } from './painter.ts';
 import { ACCENT, GLASS, INK, shade } from './color.ts';
 import { bubble, chainDim, earthHatch, levelMark } from './annot.ts';
 
-export const WALL_TONE = '#e7e2d7';
+export const WALL_TONE = '#e6e6e3';
 const DOOR_TONE = '#b59572';
 
 export interface ElevOpts {

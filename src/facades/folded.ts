@@ -23,7 +23,7 @@ export const folded: FacadeType = {
   palettes: [
     { name: 'Pre-weathered zinc', primary: '#8f9496', secondary: '#7b8083', accent: '#5f6365' },
     { name: 'Champagne anodised', primary: '#c3b293', secondary: '#ad9d80', accent: '#7f7462' },
-    { name: 'Oxide red PVDF', primary: '#97503c', secondary: '#823f2e', accent: '#5e4a43' },
+    { name: 'Mirror stainless', primary: '#d6d9db', secondary: '#9ea3a7', accent: '#5d6266' },
   ],
   generate(face, openings, levels, orient, params, palette) {
     const c = new Ctx(folded, face, openings, levels, orient, params, palette);

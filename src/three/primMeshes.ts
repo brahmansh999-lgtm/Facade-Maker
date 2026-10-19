@@ -2,7 +2,7 @@
 // flat tones baked per facet from its world normal, plus explicit edge line segments.
 import * as THREE from 'three';
 import type { Face, Prim } from '../facades/types.ts';
-import { boxAsPrism, ccw } from '../drawings/primDraw.ts';
+import { barQuad, boxAsPrism, ccw } from '../drawings/primDraw.ts';
 import { hexToRgb, INK } from '../drawings/color.ts';
 
 const LIGHT = new THREE.Vector3(-0.55, 0.85, 0.62).normalize();
@@ -142,6 +142,21 @@ export function addPrims(gb: GeoBuilder, prims: Prim[], face: Face) {
         }
         const ref = Wp(p.u, p.z, p.d - 1);
         for (let i = 0; i < seg; i++) gb.tri(c, ring[i], ring[(i + 1) % seg], p.fill, p.opacity ?? 1, ref);
+        break;
+      }
+      case 'facet': {
+        const pts = p.pts.map(([u, z, d]) => Wp(u, z, d));
+        const c = pts.reduce((a, q) => a.add(q), new THREE.Vector3()).multiplyScalar(1 / pts.length);
+        const nW = Wp(0, 0, 1).sub(Wp(0, 0, 0));
+        const ref = c.clone().sub(nW);
+        for (let i = 1; i < pts.length - 1; i++) gb.tri(pts[0], pts[i], pts[i + 1], p.fill, p.opacity ?? 1, ref);
+        for (let i = 0; i < pts.length; i++) gb.edge(pts[i], pts[(i + 1) % pts.length]);
+        break;
+      }
+      case 'bar': {
+        const q = barQuad(p).map(([u, z]) => Wp(u, z, p.d0));
+        const dir = Wp(0, 0, p.d1 - p.d0).sub(Wp(0, 0, 0));
+        gb.extrude(q, dir, p.fill, p.opacity ?? 1);
         break;
       }
       case 'line': {

@@ -52,7 +52,11 @@ export interface DiscPrim extends PrimBase { kind: 'disc'; u: number; z: number;
 export interface LinePrim extends PrimBase { kind: 'line'; pts: [number, number, number][]; width: number }
 export interface PerfPrim extends PrimBase { kind: 'perf'; u: number; z: number; w: number; h: number; d0: number; d1: number; holes: [number, number, number][] }
 export interface MeshPrim extends PrimBase { kind: 'mesh'; u: number; z: number; w: number; h: number; d0: number; d1: number; pitch: number }
-export type Prim = BoxPrim | PrismZPrim | PrismUPrim | DiscPrim | LinePrim | PerfPrim | MeshPrim;
+/** flat plate of any planar polygon in space (u,z,d) — kinetic panels, facets, ribbons */
+export interface FacetPrim extends PrimBase { kind: 'facet'; pts: [number, number, number][] }
+/** straight member between two points in the elevation plane, square-ish section w × (d1−d0) */
+export interface BarPrim extends PrimBase { kind: 'bar'; a: [number, number]; b: [number, number]; w: number; d0: number; d1: number }
+export type Prim = BoxPrim | PrismZPrim | PrismUPrim | DiscPrim | LinePrim | PerfPrim | MeshPrim | FacetPrim | BarPrim;
 
 export interface ScheduleRow { element: string; count: number; size: string; material: string; area: number; unit: 'nr' | 'm' | 'm²' }
 

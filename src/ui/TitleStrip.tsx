@@ -49,8 +49,8 @@ export function TitleStrip() {
       <div className="cell proj"><label>PROJECT</label><input type="text" value={p.name} onChange={(e) => commit((pp) => ({ ...pp, name: e.target.value }), 'name')} /></div>
       <div className="cell" style={{ minWidth: 70 }}><label>SHEET</label><span className="v mono">{cur.number}</span></div>
       <div className="cell grow"><label>DRAWING</label><span className="v">{cur.title}{ui.view === 'elev' && !ui.compare ? ` — ${fnum(active.type.num)} ${active.type.name}` : ''}</span></div>
-      <div className="cell" style={{ minWidth: 92 }}><label>SCALE</label><span className="v mono">{scale ? `1:${scale} @ A3` : '—'}</span></div>
-      <div className="cell" style={{ minWidth: 84 }}><label>DATE</label><span className="v mono">{todayText()}</span></div>
+      <div className="cell hide-sm" style={{ minWidth: 92 }}><label>SCALE</label><span className="v mono">{scale ? `1:${scale} @ A3` : '—'}</span></div>
+      <div className="cell hide-sm" style={{ minWidth: 84 }}><label>DATE</label><span className="v mono">{todayText()}</span></div>
       <div className="cell acts">
         <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl/⌘ Z)">UNDO</button>
         <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl/⌘ ⇧ Z)">REDO</button>

@@ -30,8 +30,9 @@ export function AxoView() {
       renderer.setSize(w, h, false);
       renderer.domElement.style.width = w + 'px';
       renderer.domElement.style.height = h + 'px';
-      const half = (camera.userData.half as number) ?? 12;
       const a = w / h;
+      // fit the house in whichever dimension is tighter (portrait phones)
+      const half = ((camera.userData.half as number) ?? 12) / Math.min(1, a);
       camera.left = -half * a; camera.right = half * a; camera.top = half; camera.bottom = -half;
       camera.updateProjectionMatrix();
       render();

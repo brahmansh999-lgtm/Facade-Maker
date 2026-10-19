@@ -4,11 +4,11 @@ import { overlap, subtract1D } from '../geometry/rect.ts';
 import { rng } from '../model/units.ts';
 import { mix } from '../drawings/color.ts';
 
-export const green: FacadeType = {
-  id: 'green',
-  num: 14,
-  name: 'Green facade: cables + planters',
-  description: 'Precast planter ledges cantilever off every slab band (and a bed at plinth). Stainless cables run between them on the grid rhythm; climbers grow up (or trail down) the cables and are trained away from windows and doors.',
+export const garden: FacadeType = {
+  id: 'garden',
+  num: 15,
+  name: 'Vertical garden net',
+  description: 'White GRC planter ledges cantilever off every slab band, strung with a stainless cable net on the grid rhythm. Climbers grow up (or trail down) the net and are trained away from windows and doors.',
   params: [
     def({ key: 'cable', label: 'Cable spacing', unit: 'mm', min: 300, max: 1200, step: 25, default: 600 }),
     def({ key: 'pdepth', label: 'Planter depth', unit: 'mm', min: 300, max: 900, step: 25, default: 500 }),
@@ -24,7 +24,7 @@ export const green: FacadeType = {
     { name: 'Silver creeper', primary: '#8fa08a', secondary: '#7a8c76', accent: '#9f9a91' },
   ],
   generate(face, openings, levels, orient, params, palette) {
-    const c = new Ctx(green, face, openings, levels, orient, params, palette);
+    const c = new Ctx(garden, face, openings, levels, orient, params, palette);
     const spacing = c.m('cable');
     const pd = c.m('pdepth');
     const ph = c.m('pheight');
@@ -80,7 +80,7 @@ export const green: FacadeType = {
         }
       }
     }
-    c.row('Precast planter ledge', sz(pd, ph), palette.name === 'Silver creeper' ? 'Grey precast' : 'Buff precast', pl, 0, 'm');
+    c.row('GRC planter ledge', sz(pd, ph), 'White GRC', pl, 0, 'm');
     c.row('Planting medium', '', 'Lightweight substrate', 1, pl * pd, 'm²');
     c.row('Stainless cable', 'ø4 with tensioners', 'SS 316', cables, 0);
     c.row('Stainless cable (length)', 'ø4', 'SS 316', cableLen, 0, 'm');

@@ -4,9 +4,9 @@ import { subtract1D } from '../geometry/rect.ts';
 
 export const eggcrate: FacadeType = {
   id: 'eggcrate',
-  num: 4,
-  name: 'Concrete brise-soleil egg-crate',
-  description: 'In-situ concrete egg-crate: verticals subdivide each structural bay, horizontals sit on every slab band and subdivide storeys. Deep cells shade both high and low sun; cell open area is checked against the windows behind.',
+  num: 13,
+  name: 'UHPC brise-soleil grid',
+  description: 'Thin-section ultra-high-performance concrete grid standing off the envelope: verticals subdivide each structural bay, horizontals sit on every slab band. Deep, crisp cells shade high and low sun; open area is checked against the windows behind.',
   params: [
     def({ key: 'cols', label: 'Cells per bay', unit: 'nr', min: 1, max: 4, step: 1, default: 2 }),
     def({ key: 'rows', label: 'Cells per storey', unit: 'nr', min: 1, max: 3, step: 1, default: 1 }),
@@ -16,9 +16,9 @@ export const eggcrate: FacadeType = {
     def({ key: 'slant', label: 'Vertical splay', unit: '°', min: 0, max: 30, step: 1, default: 0 }),
   ],
   palettes: [
-    { name: 'Board-marked concrete', primary: '#bcb8b0', secondary: '#a8a49c', accent: '#8f8b84' },
-    { name: 'Pigmented ochre', primary: '#cfae7f', secondary: '#bb9a6d', accent: '#8f7e66' },
-    { name: 'Whitewash', primary: '#e6e2d9', secondary: '#d6d1c6', accent: '#a9a49a' },
+    { name: 'White UHPC', primary: '#ebeae6', secondary: '#dad8d3', accent: '#a3a5a7' },
+    { name: 'Graphite UHPC', primary: '#5d6164', secondary: '#4c4f52', accent: '#8a8e91' },
+    { name: 'Sand UHPC', primary: '#d8ccb6', secondary: '#c5b9a2', accent: '#8f877a' },
   ],
   generate(face, openings, levels, orient, params, palette) {
     const c = new Ctx(eggcrate, face, openings, levels, orient, params, palette);
@@ -65,10 +65,10 @@ export const eggcrate: FacadeType = {
         hLen += r.x1 - r.x0;
       }
     }
-    c.row('Vertical fin', sz(t, depth), 'RCC, ' + palette.name, vs.length, 0);
-    c.row('Vertical fin (length)', sz(t, depth), 'RCC, ' + palette.name, vLen, 0, 'm');
-    c.row('Horizontal fin (length)', sz(t, depth), 'RCC, ' + palette.name, hLen, 0, 'm');
-    c.row('Concrete in fins', '', 'M30 RCC', 1, (vLen + hLen) * t * depth, 'm²');
+    c.row('Vertical fin', sz(t, depth), 'UHPC, ' + palette.name, vs.length, 0);
+    c.row('Vertical fin (length)', sz(t, depth), 'UHPC, ' + palette.name, vLen, 0, 'm');
+    c.row('Horizontal fin (length)', sz(t, depth), 'UHPC, ' + palette.name, hLen, 0, 'm');
+    c.row('Concrete in fins', '', 'UHPC C150', 1, (vLen + hLen) * t * depth, 'm²');
     c.notes.push(`Cell ${Math.round(cellW * 1000)} × ${Math.round(cellH * 1000)} mm, ${Math.round(porosity * 100)}% open.`);
     return c.finish();
   },

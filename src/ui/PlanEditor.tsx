@@ -61,7 +61,8 @@ export function PlanEditor() {
 
   const X = (x: number) => v.X(x), Y = (y: number) => v.Y(y);
   const one = ui.selRooms.length === 1 ? L.level.rooms.find((r) => r.id === ui.selRooms[0]) : undefined;
-  const overlay = (
+  const coarse = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+  const overlay = (mmPerPx: number) => (
     <g>
       {L.level.rooms.map((r) => {
         const b = roomRect(r);
@@ -77,14 +78,15 @@ export function PlanEditor() {
         const sel = ui.selOpening === o.id;
         return (
           <g key={o.id} style={{ cursor: 'pointer' }} onPointerDown={(e) => { if (e.button) return; e.stopPropagation(); setUI({ selOpening: o.id, selRooms: [] }); }}>
-            <circle cx={X(p[0])} cy={Y(p[1])} r={1.6} fill="transparent" />
+            <circle cx={X(p[0])} cy={Y(p[1])} r={Math.max(1.6, (coarse ? 16 : 7) * mmPerPx)} fill="transparent" />
             <circle cx={X(p[0])} cy={Y(p[1])} r={sel ? 1.0 : 0.55} fill={sel ? ACCENT : o.overridden ? '#1b1a17' : 'transparent'} stroke={ACCENT} strokeWidth={0.25} />
           </g>
         );
       })}
       {one && one.type !== 'stair' && ui.tool === 'select' && (() => {
         const b = roomRect(one);
-        const hz = 1.6;
+        const hz = Math.max(1.6, (coarse ? 26 : 9) * mmPerPx);
+        const hs = Math.max(1.8, (coarse ? 12 : 6) * mmPerPx);
         const edges: { e: Edge; x: number; y: number; w: number; h: number; cur: string }[] = [
           { e: 'x0', x: X(b.x0) - hz / 2, y: Y(b.y1), w: hz, h: (b.y1 - b.y0) * v.k, cur: 'ew-resize' },
           { e: 'x1', x: X(b.x1) - hz / 2, y: Y(b.y1), w: hz, h: (b.y1 - b.y0) * v.k, cur: 'ew-resize' },
@@ -94,7 +96,7 @@ export function PlanEditor() {
         return edges.map((g) => (
           <g key={g.e}>
             <rect x={g.x} y={g.y} width={g.w} height={g.h} fill="transparent" style={{ cursor: g.cur }} onPointerDown={(e) => startEdge(e, one.id, g.e)} />
-            <rect x={g.x + g.w / 2 - 0.9} y={g.y + g.h / 2 - 0.9} width={1.8} height={1.8} fill="#f2efe8" stroke={ACCENT} strokeWidth={0.3} pointerEvents="none" />
+            <rect x={g.x + g.w / 2 - hs / 2} y={g.y + g.h / 2 - hs / 2} width={hs} height={hs} fill="#f2efe8" stroke={ACCENT} strokeWidth={0.3} pointerEvents="none" />
           </g>
         ));
       })()}

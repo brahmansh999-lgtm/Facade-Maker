@@ -1,5 +1,5 @@
 import type { Face, FacadeOutput } from './types.ts';
-import { primBox } from '../drawings/primDraw.ts';
+import { barHitsRect, primBox } from '../drawings/primDraw.ts';
 
 export interface FacadeIssue { openingTag: string; kind: 'covers' | 'porosity' | 'door' | 'offset'; detail: string }
 
@@ -17,6 +17,8 @@ export function checkFacade(face: Face, out: FacadeOutput): FacadeIssue[] {
       const w = Math.min(b.u1, o.u1) - Math.max(b.u0, o.u0);
       const h = Math.min(b.z1, o.z1) - Math.max(b.z0, o.z0);
       if (w <= 0.005 || h <= 0.005 || w * h < 1e-4) continue;
+      // diagonal members: test the member itself, not its bounding box
+      if (p.kind === 'bar' && !barHitsRect(p, { x0: o.u0 + 0.005, x1: o.u1 - 0.005, y0: o.z0 + 0.005, y1: o.z1 - 0.005 })) continue;
       if (p.kind === 'line' && (p.porosity ?? 0.98) >= 0.9 && !o.door) continue;
       let issue: FacadeIssue | null = null;
       if (o.door) issue = { openingTag: o.tag, kind: 'door', detail: `element in front of door ${o.tag}` };

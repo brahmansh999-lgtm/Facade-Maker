@@ -5,9 +5,9 @@ const BASE = 0.03;
 
 export const fluted: FacadeType = {
   id: 'fluted',
-  num: 6,
-  name: 'Fluted precast / GRC panels',
-  description: 'Storey-high GRC panels hung from the slab edge; horizontal joints sit at the underside of each slab band, vertical joints on a panel module inside each structural bay. Flutes cut around openings with returned reveals.',
+  num: 12,
+  name: 'Fluted white GRC, wave',
+  description: 'Storey-high GRC panels hung from the slab edge with flutes whose depth swells and fades as a wave along the facade. Horizontal joints at slab bands, vertical joints on a module inside each bay; flutes return cleanly at every opening.',
   params: [
     def({ key: 'flute', label: 'Flute width', unit: 'mm', min: 50, max: 300, step: 10, default: 120 }),
     def({ key: 'fdepth', label: 'Flute depth', unit: 'mm', min: 10, max: 80, step: 5, default: 35 }),
@@ -17,11 +17,12 @@ export const fluted: FacadeType = {
     def({ key: 'joint', label: 'Joint', unit: 'mm', min: 5, max: 25, step: 1, default: 12 }),
     def({ key: 'layout', label: 'Joint layout', unit: '', kind: 'select', default: 'stack', options: [
       { value: 'stack', label: 'Stack bond' }, { value: 'offset', label: 'Half offset by storey' }] }),
+    def({ key: 'wave', label: 'Depth wave', unit: '%', min: 0, max: 100, step: 1, default: 70 }),
   ],
   palettes: [
-    { name: 'Natural GRC', primary: '#cdc9c0', secondary: '#bab6ad', accent: '#8f8b83' },
-    { name: 'Terracotta-tinted', primary: '#c99a7c', secondary: '#b5866a', accent: '#8a7569' },
-    { name: 'Charcoal', primary: '#6f6c67', secondary: '#5d5a55', accent: '#a7a39b' },
+    { name: 'Pure white GRC', primary: '#efeee9', secondary: '#dfded9', accent: '#9c9ea0' },
+    { name: 'Pearl grey', primary: '#cfd1d1', secondary: '#bcbebe', accent: '#85888a' },
+    { name: 'Charcoal', primary: '#5f6265', secondary: '#4e5154', accent: '#9a9da0' },
   ],
   generate(face, openings, levels, orient, params, palette) {
     const c = new Ctx(fluted, face, openings, levels, orient, params, palette);
@@ -31,6 +32,8 @@ export const fluted: FacadeType = {
     const pw = c.m('panel');
     const j = c.m('joint');
     const offsetLayout = c.str('layout') === 'offset';
+    const wave = c.pct('wave');
+    const waveLen = Math.max(2.4, c.width / 1.5);
     // panel rows: joints at underside of each band
     const rowsZ: [number, number][] = [];
     const breaks = [c.bottom, ...face.levels.slice(1).map((l) => l.ffl - BAND), face.roofZ - BAND, c.top];
@@ -41,9 +44,11 @@ export const fluted: FacadeType = {
       const pts: [number, number][] = [];
       const f = (u: number) => {
         const x = (((u - phase) % fw) + fw) % fw / fw;
-        if (prof === 'round') return fd * (1 - Math.sin(Math.PI * x));
-        if (prof === 'vee') return fd * Math.abs(2 * x - 1);
-        return x > 0.2 && x < 0.8 ? 0 : fd;
+        // flute depth swells and fades along the facade
+        const amp = fd * (1 - wave * 0.5 * (1 - Math.cos((u / waveLen) * Math.PI * 2)));
+        if (prof === 'round') return fd - amp * Math.sin(Math.PI * x);
+        if (prof === 'vee') return fd - amp * (1 - Math.abs(2 * x - 1));
+        return x > 0.2 && x < 0.8 ? fd - amp : fd;
       };
       const step = prof === 'round' ? fw / 6 : prof === 'vee' ? fw / 2 : fw / 10;
       const samples: number[] = [u1];

@@ -6,7 +6,8 @@ interface Props {
   svg: string;
   /** refit when this changes (e.g. a different sheet) */
   fitKey: string;
-  overlay?: ReactNode;
+  /** drawn in sheet mm; a function receives the current mm-per-screen-pixel (for touch-sized handles) */
+  overlay?: ReactNode | ((mmPerPx: number) => ReactNode);
   /** left-drag pans (off in the plan editor, where left-drag edits) */
   panWithLeft?: boolean;
   svgRef?: RefObject<SVGSVGElement | null>;
@@ -90,30 +91,72 @@ export function SheetView({ svg, fitKey, overlay, panWithLeft = true, svgRef, fo
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
   }, []);
 
+  // touch: two fingers always pinch-zoom + pan; one finger pans where nothing else takes it
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; cx: number; cy: number } | null>(null);
+  const pinchState = () => {
+    const [a, b] = [...touches.current.values()];
+    return { d: Math.hypot(b.x - a.x, b.y - a.y) || 1, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+  };
+  const onPointerDownCapture = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch') return;
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.current.size === 2) {
+      pinch.current = pinchState();
+      pan.current = null;
+      e.stopPropagation();
+    }
+  };
   const onPointerDown = (e: React.PointerEvent) => {
-    const wantPan = e.button === 1 || e.button === 2 || space.current || (e.button === 0 && panWithLeft);
+    if (pinch.current) return;
+    const wantPan = e.button === 1 || e.button === 2 || space.current || (e.button === 0 && (panWithLeft || e.pointerType === 'touch'));
     if (!wantPan) return;
     e.preventDefault();
     pan.current = { x: e.clientX, y: e.clientY };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!pan.current || !host.current) return;
+    if (!host.current) return;
+    if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.current && touches.current.size >= 2) {
+      const now = pinchState();
+      const prev = pinch.current;
+      const r = host.current.getBoundingClientRect();
+      setVb((v) => {
+        const s = r.width / v.w;
+        const f = prev.d / now.d;
+        const w = Math.min(A3.w * 6, Math.max(8, v.w * f));
+        const h = (v.h / v.w) * w;
+        const fx = (now.cx - r.left) / r.width, fy = (now.cy - r.top) / r.height;
+        const x = v.x + (v.w - w) * fx - (now.cx - prev.cx) / s;
+        const y = v.y + (v.h - h) * fy - (now.cy - prev.cy) / s;
+        return { x, y, w, h };
+      });
+      pinch.current = now;
+      return;
+    }
+    if (!pan.current) return;
     const s = host.current.clientWidth / vb.w;
     const dx = (e.clientX - pan.current.x) / s, dy = (e.clientY - pan.current.y) / s;
     pan.current = { x: e.clientX, y: e.clientY };
     setVb((v) => ({ ...v, x: v.x - dx, y: v.y - dy }));
   };
-  const onPointerUp = () => { pan.current = null; };
+  const onPointerUp = (e: React.PointerEvent) => {
+    touches.current.delete(e.pointerId);
+    if (touches.current.size < 2) pinch.current = null;
+    pan.current = null;
+  };
+  const mmPerPx = host.current ? vb.w / (host.current.clientWidth || 1) : 0.3;
 
   return (
-    <div className="sheetwrap" ref={host} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+    <div className="sheetwrap" ref={host} onPointerDownCapture={onPointerDownCapture} onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       onContextMenu={(e) => e.preventDefault()} style={{ cursor: pan.current ? 'grabbing' : panWithLeft ? 'grab' : 'default' }}>
       <svg className="sheet" ref={ref} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet">
         <rect x={-2000} y={-2000} width={4420} height={4297} fill="#e3dfd4" />
         <rect x={1.2} y={1.6} width={A3.w} height={A3.h} fill="#cfcabd" />
         <g dangerouslySetInnerHTML={{ __html: inner }} />
-        {overlay}
+        {typeof overlay === 'function' ? overlay(mmPerPx) : overlay}
       </svg>
     </div>
   );

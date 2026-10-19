@@ -6,23 +6,23 @@ const BASE = 0.05;
 
 export const ribbed: FacadeType = {
   id: 'ribbed',
-  num: 15,
-  name: 'Ribbed cast-stone units',
-  description: 'Stacked cast-stone blocks with vertical ribs. Rib depth grows with height so the building gets more shadow — and more texture — toward the sky. Courses come off the same datums as the openings; units stop square at every jamb.',
+  num: 14,
+  name: 'Ribbed UHPC, height gradient',
+  description: 'Precast UHPC units with vertical ribs whose depth grows with height, so the building gains shadow and texture toward the sky. Courses come off the same datums as the openings; units stop square at every jamb.',
   params: [
-    def({ key: 'uh', label: 'Unit height', unit: 'mm', min: 200, max: 600, step: 10, default: 400 }),
-    def({ key: 'uw', label: 'Unit length', unit: 'mm', min: 400, max: 1500, step: 25, default: 800 }),
+    def({ key: 'uh', label: 'Unit height', unit: 'mm', min: 300, max: 1200, step: 25, default: 750 }),
+    def({ key: 'uw', label: 'Unit length', unit: 'mm', min: 600, max: 2400, step: 50, default: 1500 }),
     def({ key: 'pitch', label: 'Rib pitch', unit: 'mm', min: 50, max: 200, step: 5, default: 100 }),
     def({ key: 'd0', label: 'Rib depth at base', unit: 'mm', min: 10, max: 100, step: 5, default: 20 }),
     def({ key: 'd1', label: 'Rib depth at top', unit: 'mm', min: 10, max: 150, step: 5, default: 80 }),
     def({ key: 'joint', label: 'Joint', unit: 'mm', min: 5, max: 20, step: 1, default: 10 }),
-    def({ key: 'stack', label: 'Stacking', unit: '', kind: 'select', default: 'running', options: [
+    def({ key: 'stack', label: 'Stacking', unit: '', kind: 'select', default: 'stack', options: [
       { value: 'running', label: 'Running bond' }, { value: 'stack', label: 'Stack bond' }] }),
   ],
   palettes: [
-    { name: 'Limestone cast', primary: '#d9d1c0', secondary: '#c7bead', accent: '#a69d8d' },
-    { name: 'Sandstone cast', primary: '#cfb18d', secondary: '#bb9d7a', accent: '#9a8269' },
-    { name: 'Basalt cast', primary: '#77746e', secondary: '#66635e', accent: '#57544f' },
+    { name: 'White UHPC', primary: '#e9e8e3', secondary: '#d9d7d1', accent: '#a5a6a7' },
+    { name: 'Graphite UHPC', primary: '#5a5e61', secondary: '#4a4d50', accent: '#86898c' },
+    { name: 'Sand UHPC', primary: '#d6c9b1', secondary: '#c3b69e', accent: '#958b7b' },
   ],
   generate(face, openings, levels, orient, params, palette) {
     const c = new Ctx(ribbed, face, openings, levels, orient, params, palette);

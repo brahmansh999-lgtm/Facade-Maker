@@ -1,6 +1,6 @@
 import type { Brief, ElevationSetting, FaceKey, FacadeState, Project, Site, StairSpec } from './types.ts';
 import { solveLayout } from './layout.ts';
-import { FACADES, defaultParams, getFacade } from '../facades/registry.ts';
+import { FACADES, defaultParams, getFacade, hasFacade } from '../facades/registry.ts';
 
 export const DEFAULT_SITE: Site = {
   width: 12,
@@ -21,7 +21,7 @@ export const DEFAULT_BRIEF: Brief = {
   plinth: 0.45,
 };
 
-export function defaultFacade(active = 'jaali'): FacadeState {
+export function defaultFacade(active = 'pixels'): FacadeState {
   const t = getFacade(active);
   const pe = (): ElevationSetting => ({ override: false, typeId: t.id, params: defaultParams(t), palette: 0 });
   return {
@@ -60,6 +60,14 @@ export function relayout(p: Project, changes: { brief?: Partial<Brief>; site?: P
 /** Fill any params missing from an imported/older project with registry defaults. */
 export function normaliseProject(p: Project): Project {
   const f = p.facade;
+  // retired facade types (older saves) fall back to the first in the catalogue
+  if (!hasFacade(f.activeTypeId)) f.activeTypeId = FACADES[0].id;
+  for (const k of Object.keys(f.typeParams)) if (!hasFacade(k)) delete f.typeParams[k];
+  for (const k of Object.keys(f.typePalette)) if (!hasFacade(k)) delete f.typePalette[k];
+  for (const k of ['N', 'S', 'E', 'W'] as FaceKey[]) {
+    const e = f.perElevation[k];
+    if (e && !hasFacade(e.typeId)) f.perElevation[k] = { override: false, typeId: f.activeTypeId, params: {}, palette: 0 };
+  }
   for (const t of FACADES) {
     f.typeParams[t.id] = { ...defaultParams(t), ...(f.typeParams[t.id] ?? {}) };
     f.typePalette[t.id] ??= 0;

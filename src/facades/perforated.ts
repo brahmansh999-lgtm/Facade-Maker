@@ -4,11 +4,11 @@ import { overlap } from '../geometry/rect.ts';
 
 const TILE = 0.6;
 
-export const corten: FacadeType = {
-  id: 'corten',
-  num: 7,
-  name: 'Perforated weathering steel',
-  description: '3 mm weathering-steel panels on a rail sub-frame off the slab bands. Hole diameter follows a density map; tiles in front of windows are opened until they pass the room’s required free area, with doors left clear.',
+export const perforated: FacadeType = {
+  id: 'perforated',
+  num: 5,
+  name: 'Parametric perforated skin',
+  description: '3 mm aluminium panels CNC-punched from a density field, hung on a rail sub-frame off the slab bands. Holes swell in front of windows until each tile passes the room’s required free area; doors stay clear.',
   params: [
     def({ key: 'pitch', label: 'Hole pitch', unit: 'mm', min: 40, max: 150, step: 5, default: 80 }),
     def({ key: 'dmin', label: 'Min. hole', unit: 'mm', min: 5, max: 40, step: 1, default: 12 }),
@@ -19,12 +19,12 @@ export const corten: FacadeType = {
     def({ key: 'offset', label: 'Offset from wall', unit: 'mm', min: 100, max: 600, step: 10, default: 250 }),
   ],
   palettes: [
-    { name: 'Weathered corten', primary: '#8e4f30', secondary: '#7a4228', accent: '#5a5550' },
-    { name: 'Early patina', primary: '#a8653d', secondary: '#945732', accent: '#615b55' },
-    { name: 'Dark bronze', primary: '#5e4a3a', secondary: '#4f3e31', accent: '#77716a' },
+    { name: 'Anodised silver', primary: '#bfc2c4', secondary: '#a7abae', accent: '#5f6366' },
+    { name: 'Bronze anodised', primary: '#8a6a4c', secondary: '#73583f', accent: '#5a5048' },
+    { name: 'Matte black', primary: '#35383b', secondary: '#2a2c2e', accent: '#74787b' },
   ],
   generate(face, openings, levels, orient, params, palette) {
-    const c = new Ctx(corten, face, openings, levels, orient, params, palette);
+    const c = new Ctx(perforated, face, openings, levels, orient, params, palette);
     const pitch = c.m('pitch');
     const k = c.clim(1.15, 0.8);
     const dmin = c.m('dmin') * k, dmax = Math.min(pitch * 0.92, c.m('dmax') * k);

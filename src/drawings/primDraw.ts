@@ -37,12 +37,48 @@ export function primBox(p: Prim): { u0: number; u1: number; z0: number; z1: numb
       return { u0: p.u0, u1: p.u1, z0: Math.min(...zs), z1: Math.max(...zs), d0: Math.min(...ds), d1: Math.max(...ds) };
     }
     case 'disc': return { u0: p.u - p.r, u1: p.u + p.r, z0: p.z - p.r, z1: p.z + p.r, d0: p.d, d1: p.d };
-    case 'line': {
+    case 'line': case 'facet': {
       const us = p.pts.map((q) => q[0]), zs = p.pts.map((q) => q[1]), ds = p.pts.map((q) => q[2]);
       return { u0: Math.min(...us), u1: Math.max(...us), z0: Math.min(...zs), z1: Math.max(...zs), d0: Math.min(...ds), d1: Math.max(...ds) };
     }
+    case 'bar': {
+      const q = barQuad(p);
+      const us = q.map((x) => x[0]), zs = q.map((x) => x[1]);
+      return { u0: Math.min(...us), u1: Math.max(...us), z0: Math.min(...zs), z1: Math.max(...zs), d0: p.d0, d1: p.d1 };
+    }
     case 'perf': case 'mesh': return { u0: p.u, u1: p.u + p.w, z0: p.z, z1: p.z + p.h, d0: p.d0, d1: p.d1 };
   }
+}
+
+/** the bar's outline in the elevation plane (u,z), CCW */
+export function barQuad(p: Extract<Prim, { kind: 'bar' }>): [number, number][] {
+  const [ua, za] = p.a, [ub, zb] = p.b;
+  const L = Math.hypot(ub - ua, zb - za) || 1;
+  const nu = (-(zb - za) / L) * (p.w / 2), nz = ((ub - ua) / L) * (p.w / 2);
+  return [[ua - nu, za - nz], [ub - nu, zb - nz], [ub + nu, zb + nz], [ua + nu, za + nz]];
+}
+
+/** does a bar come within its half-width of rect (u,z)? */
+export function barHitsRect(p: Extract<Prim, { kind: 'bar' }>, r: { x0: number; x1: number; y0: number; y1: number }): boolean {
+  const n = Math.max(8, Math.ceil(Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1]) / 0.05));
+  const m = p.w / 2;
+  for (let i = 0; i <= n; i++) {
+    const u = p.a[0] + ((p.b[0] - p.a[0]) * i) / n, z = p.a[1] + ((p.b[1] - p.a[1]) * i) / n;
+    if (u > r.x0 - m && u < r.x1 + m && z > r.y0 - m && z < r.y1 + m) return true;
+  }
+  return false;
+}
+
+/** facet normal (u,z,d), oriented to face the viewer (+d) */
+export function facetNormal(pts: [number, number, number][]): [number, number, number] {
+  let nu = 0, nz = 0, nd = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [u1, z1, d1] = pts[i], [u2, z2, d2] = pts[(i + 1) % pts.length];
+    nu += (z1 - z2) * (d1 + d2); nz += (d1 - d2) * (u1 + u2); nd += (u1 - u2) * (z1 + z2);
+  }
+  const l = Math.hypot(nu, nz, nd) || 1;
+  const s = nd < 0 ? -1 : 1;
+  return [(s * nu) / l, (s * nz) / l, (s * nd) / l];
 }
 
 export interface ElevMap { X: (u: number) => number; Y: (z: number) => number; k: number }
@@ -78,6 +114,17 @@ export function drawPrims(pt: Painter, prims: Prim[], m: ElevMap, opts: { line?:
         }
         const bb = primBox(p);
         pt.rect(m.X(bb.u0), m.Y(bb.z1), (bb.u1 - bb.u0) * m.k, (bb.z1 - bb.z0) * m.k, { stroke: INK, sw });
+        break;
+      }
+      case 'facet': {
+        const [nu, nz, nd] = facetNormal(p.pts);
+        const pts = p.pts.flatMap(([u, z]) => [m.X(u), m.Y(z)]);
+        pt.poly(pts, true, { fill: facetTone(p.fill, nu, nz, nd), stroke: INK, sw: fine, opacity: p.opacity });
+        break;
+      }
+      case 'bar': {
+        const pts = barQuad(p).flatMap(([u, z]) => [m.X(u), m.Y(z)]);
+        pt.poly(pts, true, { fill: p.fill, stroke: INK, sw, opacity: p.opacity });
         break;
       }
       case 'disc':

@@ -6,8 +6,8 @@ import { lerp } from '../model/units.ts';
 export const fins: FacadeType = {
   id: 'fins',
   num: 2,
-  name: 'Vertical timber fins',
-  description: 'Hardwood fins on steel rails fixed at each slab band. Fins land on every grid line and are evenly spaced within bays; their angle sweeps across the face. In front of glazing a fin straightens or drops out to keep the required free area.',
+  name: 'Twisting aluminium fins',
+  description: 'Extruded aluminium blade fins on rails at every slab band. Fins land on each grid line and subdivide the bays; their angle twists across the face, leaning toward the low sun on exposed elevations. In front of glazing a fin straightens or drops out to keep the free area.',
   params: [
     def({ key: 'spacing', label: 'Spacing', unit: 'mm', min: 150, max: 900, step: 25, default: 400 }),
     def({ key: 'depth', label: 'Fin depth', unit: 'mm', min: 150, max: 600, step: 25, default: 300 }),
@@ -19,9 +19,9 @@ export const fins: FacadeType = {
       { value: 'storey', label: 'Storey height' }, { value: 'full', label: 'Full height' }] }),
   ],
   palettes: [
-    { name: 'Teak', primary: '#a77a4f', secondary: '#8a6240', accent: '#5f5c57' },
-    { name: 'Western red cedar', primary: '#c08a62', secondary: '#a5714d', accent: '#6b6862' },
-    { name: 'Charred larch', primary: '#3f3a35', secondary: '#2e2a26', accent: '#7c776f' },
+    { name: 'Anodised silver', primary: '#c7cacc', secondary: '#a9adb0', accent: '#6f7377' },
+    { name: 'Champagne', primary: '#d3c29f', secondary: '#bba985', accent: '#7c7262' },
+    { name: 'Matte black', primary: '#3b3e41', secondary: '#2c2e30', accent: '#7f8386' },
   ],
   generate(face, openings, levels, orient, params, palette) {
     const c = new Ctx(fins, face, openings, levels, orient, params, palette);
@@ -81,8 +81,8 @@ export const fins: FacadeType = {
       }
       c.row('MS channel rail', '75 × 40', 'Galvanised steel, ' + (palette.name === 'Charred larch' ? 'black' : 'grey'), c.width, 0, 'm');
     }
-    c.row('Timber fin', sz(t, depth), palette.name, count, 0);
-    c.row('Timber fin (length)', sz(t, depth), palette.name, len, 0, 'm');
+    c.row('Aluminium fin', sz(t, depth), palette.name, count, 0);
+    c.row('Aluminium fin (length)', sz(t, depth), palette.name, len, 0, 'm');
     if (dropped) c.notes.push(`${dropped} fin run(s) omitted in front of glazing to keep the required free area.`);
     return c.finish();
   },
