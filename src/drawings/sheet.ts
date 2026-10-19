@@ -7,7 +7,7 @@ export const FRAME = { x0: 10, y0: 8, x1: 410, y1: 289 };
 export const TB = { h: 18 };
 /** drawable region above the title block */
 export const AREA = { x0: 16, y0: 14, x1: 404, y1: FRAME.y1 - TB.h - 6 };
-export const SCALES = [50, 100, 200, 250, 500];
+export const SCALES = [50, 100, 150, 200, 250, 500];
 
 export interface SheetMeta {
   id: string;
