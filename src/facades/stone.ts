@@ -1,5 +1,5 @@
 import type { FacadeType } from './types.ts';
-import { Ctx, coursesBetween, def, freeIntervals, sz } from './kit.ts';
+import { Ctx, coursesBetween, def, freeIntervals } from './kit.ts';
 import { rng } from '../model/units.ts';
 import { mix, shade } from '../drawings/color.ts';
 

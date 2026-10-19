@@ -1,5 +1,5 @@
 import type { FacadeType } from './types.ts';
-import { Ctx, def, sz } from './kit.ts';
+import { Ctx, def } from './kit.ts';
 import { overlap } from '../geometry/rect.ts';
 import { shade } from '../drawings/color.ts';
 import { clamp } from '../model/units.ts';
