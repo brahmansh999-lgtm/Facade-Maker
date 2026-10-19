@@ -12,6 +12,7 @@ import { TXT, bubble, chainDim, earthHatch, levelMark } from './annot.ts';
 import { POCHE } from './plan.ts';
 
 const BEAM = 0.45;
+const BRICK = '#e3d3c1', PCC = '#ebe6da', HARDCORE = '#dcd3c2', SCREED = '#9b958a', FINISH = '#f1ece1', COBA = '#e2d8c6';
 
 export function sectionGeom(d: Derived) {
   const st = d.stair;
@@ -55,6 +56,36 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
     const x0 = Math.min(X(a0), X(a1)), x1 = Math.max(X(a0), X(a1));
     pt.rect(x0, Y(Math.max(z0, z1)), x1 - x0, Math.abs(z1 - z0) * v.k, s);
   };
+  // ---- materials: brick (hatched), PCC (stippled), hardcore (stones), screed/finish (light)
+  const box = (a0: number, z0: number, a1: number, z1: number) => {
+    const x0 = Math.min(X(a0), X(a1)), x1 = Math.max(X(a0), X(a1));
+    return { x0, x1, y0: Y(Math.max(z0, z1)), y1: Y(Math.min(z0, z1)) };
+  };
+  const hatch = (a0: number, z0: number, a1: number, z1: number, gap: number) => {
+    const b = box(a0, z0, a1, z1);
+    for (let c = b.x0 + b.y0 + gap; c < b.x1 + b.y1; c += gap) {
+      const xa = Math.max(b.x0, c - b.y1), xb = Math.min(b.x1, c - b.y0);
+      if (xb > xa) pt.line(xa, c - xa, xb, c - xb, { stroke: INK, sw: W.THIN * 0.7 });
+    }
+  };
+  const brick = (a0: number, z0: number, a1: number, z1: number) => {
+    R(a0, z0, a1, z1, { fill: BRICK, stroke: INK, sw: W.PROJ });
+    hatch(a0, z0, a1, z1, 0.9);
+  };
+  const pcc = (a0: number, z0: number, a1: number, z1: number) => {
+    R(a0, z0, a1, z1, { fill: PCC, stroke: INK, sw: W.BEYOND });
+    const b = box(a0, z0, a1, z1);
+    for (let y = b.y0 + 0.35, k = 0; y < b.y1; y += 0.55, k++) for (let x = b.x0 + 0.3 + (k % 2) * 0.4; x < b.x1; x += 0.8) pt.circle(x, y, 0.09, { fill: INK });
+  };
+  const hardcore = (a0: number, z0: number, a1: number, z1: number) => {
+    R(a0, z0, a1, z1, { fill: HARDCORE, stroke: INK, sw: W.BEYOND });
+    const b = box(a0, z0, a1, z1), r = Math.min(0.45, (b.y1 - b.y0) * 0.3);
+    for (let x = b.x0 + 0.6, k = 0; x < b.x1 - 0.3; x += 1.1, k++) pt.circle(x, (b.y0 + b.y1) / 2 + (k % 2 ? 0.2 : -0.2), r, { stroke: INK, sw: W.THIN * 0.7 });
+  };
+  const finish = (a0: number, z0: number, a1: number, z1: number) => R(a0, z0, a1, z1, { fill: FINISH, stroke: INK, sw: W.THIN });
+  /** leader notes collected while drawing, laid out in a column at the end */
+  const notes: { a: number; z: number; text: string }[] = [];
+
   // extent of each storey along the cut (massing steps show up here)
   const spans = d.regions.map((rg): [number, number] => {
     const hit = rg.rects().filter((r) => C(r.x0, r.y0) < cut && C(r.x1, r.y1) > cut);
@@ -74,13 +105,35 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
   const xl = Math.min(X(gLo - 2.5), X(gHi + 2.5)), xr = Math.max(X(gLo - 2.5), X(gHi + 2.5));
   pt.line(xl, Y(0), xr, Y(0), { stroke: INK, sw: W.CUT * 1.2 });
   earthHatch(pt, xl, xr, Y(0), 1.4);
-  R(lo, 0, hi, ffls[0] - 0.1, { fill: mix(PAPER, '#c9c2b2', 0.5), stroke: INK, sw: W.BEYOND });
-  for (let a = lo + 0.3; a < hi - 0.2; a += 0.45) pt.line(X(a), Y(0.05), X(a + 0.25), Y(ffls[0] - 0.15), { stroke: shade(PAPER, 0.35), sw: W.THIN });
+  // ground floor build-up: earth fill, 150 hardcore, 100 PCC 1:4:8, 60 screed, 40 tile
+  const f0 = ffls[0];
+  R(lo, 0, hi, f0 - 0.35, { fill: mix(PAPER, '#c9c2b2', 0.5), stroke: INK, sw: W.BEYOND });
+  for (let a = lo + 0.3; a < hi - 0.2; a += 0.45) pt.line(X(a), Y(0.03), X(a + 0.1), Y(f0 - 0.38), { stroke: shade(PAPER, 0.35), sw: W.THIN });
+  hardcore(lo, f0 - 0.35, hi, f0 - 0.2);
+  pcc(lo, f0 - 0.2, hi, f0 - 0.1);
+  R(lo, f0 - 0.1, hi, f0 - 0.04, { fill: SCREED, stroke: INK, sw: W.BEYOND });
+  finish(lo, f0 - 0.04, hi, f0);
+  // the ends of the cut as drawn (the view may be mirrored): notes split between them
+  const endL = X(lo) < X(hi) ? lo : hi, endR = endL === lo ? hi : lo, inL = endL === lo ? 1 : -1;
+  notes.push({ a: endL + inL * 1.6, z: f0 - 0.2, text: '40 TILE / 60 SCREED / 100 PCC 1:4:8 / 150 HARDCORE / FILL' });
+  // end walls: stepped brick footing on a PCC bed, brick to plinth, RCC plinth beam with DPC
   for (const e of [lo, hi - EXT_WALL]) {
-    R(e, -0.6, e + EXT_WALL, ffls[0], poche);
-    R(e + EXT_WALL / 2 - 0.6, -1.5, e + EXT_WALL / 2 + 0.6, -0.6, { stroke: INK, sw: W.BEYOND, dash: [1.4, 0.9] });
+    pcc(e - 0.45, -1.35, e + EXT_WALL + 0.45, -1.2);
+    brick(e - 0.3, -1.2, e + EXT_WALL + 0.3, -1.05);
+    brick(e - 0.15, -1.05, e + EXT_WALL + 0.15, -0.9);
+    brick(e, -0.9, e + EXT_WALL, f0 - 0.3);
+    R(e, f0 - 0.3, e + EXT_WALL, f0, poche);
+    pt.line(X(e - 0.04), Y(f0 - 0.3), X(e + EXT_WALL + 0.04), Y(f0 - 0.3), { stroke: INK, sw: W.PROJ * 1.6 });
   }
-  R(lo, ffls[0] - 0.1, hi, ffls[0], poche);
+  notes.push({ a: endR - inL * EXT_WALL / 2, z: f0 - 0.15, text: 'RCC PLINTH BEAM 230x300 / 40 DPC UNDER' });
+  notes.push({ a: endL + inL * EXT_WALL / 2, z: -1.1, text: 'STEPPED BRICK FOOTING ON 150 PCC 1:4:8' });
+  // isolated column footings on the internal grid lines, beyond the cut
+  for (const q of (g.axisY ? gridLines(p).ys : gridLines(p).xs)) {
+    const ga = q.v;
+    if (ga < lo + 0.5 || ga > hi - 0.5) continue;
+    R(ga - 0.6, -1.5, ga + 0.6, -1.2, { stroke: INK, sw: W.BEYOND, dash: [1.4, 0.9] });
+    R(ga - 0.15, -1.2, ga + 0.15, f0 - 0.35, { stroke: INK, sw: W.BEYOND, dash: [1.4, 0.9] });
+  }
 
   // slabs with stair opening, beams on grid lines
   const gl = gridLines(p);
@@ -88,24 +141,54 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
   for (let i = 1; i < ffls.length; i++) {
     const z = ffls[i];
     const sa = Math.min(spans[i - 1][0], (spans[i] ?? spans[i - 1])[0]), sb = Math.max(spans[i - 1][1], (spans[i] ?? spans[i - 1])[1]);
-    for (const [a, b] of subtract1D(sa, sb, [hole])) R(a, z - SLAB, b, z, poche);
+    for (const [a, b] of subtract1D(sa, sb, [hole])) {
+      R(a, z - SLAB, b, z, poche);
+      // floor finish on intermediate slabs (the roof build-up is drawn separately)
+      if (i < ffls.length - 1) finish(a + (a === sa ? EXT_WALL : 0), z, b - (b === sb ? EXT_WALL : 0), z + 0.04);
+    }
+    if (i === 1) notes.push({ a: (sa + sb) / 2 + 2.2, z: z - SLAB / 2, text: `${Math.round(SLAB * 1000)} RCC SLAB / 40 TILE ON SCREED OVER` });
     for (const ga of gridAlong) {
       if (ga > hole[0] + 0.05 && ga < hole[1] - 0.05) continue;
       R(ga - EXT_WALL / 2, z - BEAM, ga + EXT_WALL / 2, z - SLAB, poche);
     }
   }
 
+  // roof build-up inside the parapets: insulation, brickbat coba laid to falls, waterproofing
+  {
+    const a = tlo + EXT_WALL, b = thi - EXT_WALL;
+    const hiZ = roofZ + 0.14, loZ = roofZ + 0.06;
+    pt.poly([X(a), Y(roofZ), X(b), Y(roofZ), X(b), Y(loZ), X(a), Y(hiZ)], true, { fill: COBA, stroke: INK, sw: W.BEYOND });
+    pt.line(X(a), Y(roofZ + 0.05), X(b), Y(roofZ + 0.05), { stroke: INK, sw: W.THIN, dash: [0.8, 0.5] });
+    pt.line(X(a), Y(hiZ + 0.012), X(b), Y(loZ + 0.012), { stroke: INK, sw: W.PROJ * 1.4 });
+    notes.push({ a: a + (b - a) * 0.3, z: roofZ + 0.1, text: 'WATERPROOFING / BRICKBAT COBA TO FALL 1:100 / 50 XPS' });
+    notes.push({ a: tlo + EXT_WALL / 2, z: roofZ + PARAPET * 0.6, text: `${Math.round(PARAPET * 1000)} H PARAPET / PRECAST COPING WITH DRIP` });
+  }
+
   // walls crossing the cut
   const crossRun = g.axisY ? 'x' : 'y';
+  let wallNote = false, chajjaNote = false;
   d.levels.forEach((L, i) => {
     const z0 = L.level.elevation, z1 = ffls[i + 1] - SLAB;
     for (const w of L.walls) {
       if (w.run !== crossRun || cut < w.s0 - 1e-3 || cut > w.s1 + 1e-3) continue;
       const a = w.c - w.thickness / 2, b = w.c + w.thickness / 2;
       const op = L.openings.find((o) => o.wallId === w.id && Math.abs(o.center - cut) <= o.width / 2);
-      if (!op) { R(a, z0, b, z1, poche); continue; }
-      if (op.sill > 0.01) R(a, z0, b, z0 + op.sill, poche);
-      R(a, z0 + op.head, b, z1, poche);
+      if (!op) {
+        brick(a, z0, b, z1);
+        if (i === 1 && !wallNote) { wallNote = true; notes.push({ a: (a + b) / 2, z: z0 + 1.6, text: `${Math.round(w.thickness * 1000)} BRICK WALL / 12 PLASTER BOTH FACES` }); }
+        continue;
+      }
+      if (op.sill > 0.01) brick(a, z0, b, z0 + op.sill);
+      // RCC lintel over the opening, brick above
+      R(a, z0 + op.head, b, z0 + op.head + 0.15, poche);
+      if (z1 > z0 + op.head + 0.15) brick(a, z0 + op.head + 0.15, b, z1);
+      if (w.external && (op.kind === 'window' || op.kind === 'garden')) {
+        // chajja: RCC sunshade cantilevered off the lintel, tapering to its drip edge
+        const out = w.neg === null ? -1 : 1, face = w.c + out * (w.thickness / 2), tip = face + out * 0.45;
+        const zt = z0 + op.head + 0.15;
+        pt.poly([X(face), Y(zt), X(tip), Y(zt - 0.05), X(tip), Y(zt - 0.1), X(face), Y(zt - 0.15)], true, poche);
+        if (!chajjaNote) { chajjaNote = true; notes.push({ a: tip, z: zt - 0.07, text: 'RCC LINTEL 150 / 450 CHAJJA WITH DRIP' }); }
+      }
       if (op.kind === 'window' || op.kind === 'ventilator') {
         R(w.c - 0.02, z0 + op.sill, w.c + 0.02, z0 + op.head, { fill: GLASS, stroke: INK, sw: W.BEYOND });
         const outDir = w.neg === null ? -1 : 1;
@@ -146,7 +229,7 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
         R(a, 0, b, top - ((i + 1) * top) / (vr.nSteps + 1), poche);
       }
     }
-    pt.text(X((da + db) / 2), Y(top + 1.2), 'VERANDAH', { size: TXT.small, anchor: 'middle', spacing: 0.2 });
+    pt.text(X((da + db) / 2), Y(vr.zc0 - 0.3), 'VERANDAH', { size: TXT.small, anchor: 'middle', spacing: 0.2 });
   }
 
   // floating roof lid on its shadow gap
@@ -189,6 +272,11 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
         // handrail
         pt.line(X(sA), Y(zA + st.R + 0.9), X(sEnd), Y(zEnd + 0.9), { stroke: INK, sw: W.BEYOND });
         pt.line(X(sA), Y(zA + st.R + 0.9), X(sA), Y(zA + st.R), { stroke: INK, sw: W.BEYOND });
+        for (let r = 2; r < f.risers; r += 2) {
+          const sr = sA + f.dir * (r - 1) * st.T + (f.dir * st.T) / 2;
+          pt.line(X(sr), Y(zA + r * st.R), X(sr), Y(zA + r * st.R + 0.9), { stroke: INK, sw: W.THIN });
+        }
+        if (lvl === levels[0]) notes.push({ a: sA + f.dir * st.T * 3, z: zA + 4 * st.R + 0.9, text: 'MS HANDRAIL 900 H / BALUSTERS AT EVERY 2ND TREAD' });
       } else {
         pt.poly(flat, true, { fill: shade(PAPER, 0.08), stroke: INK, sw: W.PROJ });
       }
@@ -252,15 +340,77 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
       const wmm = Math.abs(A(b.x1, b.y1) - A(b.x0, b.y0)) * v.k;
       if (wmm < 8) continue;
       pt.text(X(am), Y(L.level.elevation + 1.3), r.name, { size: Math.min(TXT.label, wmm / (r.name.length * 0.65)), anchor: 'middle', weight: 600, spacing: 0.12 });
+      const li = levels.indexOf(L.level), ch = ffls[li + 1] - SLAB - L.level.elevation - 0.04;
+      pt.text(X(am), Y(L.level.elevation + 1.3) + 2.6, `CH ${ch.toFixed(2)}`, { size: 1.3, anchor: 'middle', font: 'mono' });
     }
   });
   pt.end();
+
+  // scale figures: one in the widest room cut on each floor, one on the verandah
+  const person = (a: number, z: number) => {
+    const h = 1.72, k = v.k;
+    const x = X(a), y = Y(z);
+    pt.circle(x, y - (h - 0.11) * k, 0.11 * k, { stroke: INK, sw: W.THIN });
+    pt.poly([x - 0.2 * k, y - 1.45 * k, x + 0.2 * k, y - 1.45 * k, x + 0.16 * k, y - 0.85 * k, x + 0.1 * k, y, x + 0.02 * k, y, x, y - 0.75 * k,
+      x - 0.02 * k, y, x - 0.1 * k, y, x - 0.16 * k, y - 0.85 * k], true, { fill: PAPER, stroke: INK, sw: W.THIN });
+    pt.line(x - 0.2 * k, y - 1.42 * k, x - 0.26 * k, y - 0.8 * k, { stroke: INK, sw: W.THIN });
+    pt.line(x + 0.2 * k, y - 1.42 * k, x + 0.26 * k, y - 0.8 * k, { stroke: INK, sw: W.THIN });
+  };
+  d.levels.forEach((L) => {
+    const span = (b: { x0: number; y0: number; x1: number; y1: number }) => Math.abs(A(b.x1, b.y1) - A(b.x0, b.y0));
+    const rs = L.level.rooms.filter((r) => r.type !== 'stair' && r.type !== 'void').map(roomRect)
+      .filter((b) => C(b.x0, b.y0) < cut && C(b.x1, b.y1) > cut)
+      .sort((b1, b2) => span(b2) - span(b1));
+    if (rs[0]) person(Math.min(A(rs[0].x0, rs[0].y0), A(rs[0].x1, rs[0].y1)) + 0.9, L.level.elevation + 0.04);
+  });
+  if (vr && C(vr.deck.x0, vr.deck.y0) < cut && C(vr.deck.x1, vr.deck.y1) > cut) person((A(vr.deck.x0, vr.deck.y0) + A(vr.deck.x1, vr.deck.y1)) / 2, p.brief.plinth - 0.03);
+
+  // leader notes in two columns, each serving its own half of the drawing, kept apart
+  {
+    const xL = Math.min(X(gLo - 2.5), X(gHi + 2.5)) - 3;
+    const xR = Math.max(X(lo), X(hi)) + 44;
+    const mid = (X(lo) + X(hi)) / 2;
+    const placed = notes.map((n) => ({ ...n, x: X(n.a), y: Y(n.z) }));
+    for (const right of [false, true]) {
+      let last = -Infinity;
+      for (const n of placed.filter((q) => (q.x > mid) === right).sort((q1, q2) => q1.y - q2.y)) {
+        const ty = Math.max(n.y, last + 3.4);
+        last = ty;
+        const tx = right ? xR : xL;
+        pt.circle(n.x, n.y, 0.35, { fill: INK });
+        pt.poly([n.x, n.y, tx + (right ? -2 : 2), ty, tx, ty], false, { stroke: INK, sw: W.THIN });
+        pt.text(tx + (right ? 0.6 : -0.6), ty + 0.5, n.text, { size: 1.3, font: 'mono', anchor: right ? 'start' : 'end' });
+      }
+    }
+  }
+
+  // material legend
+  {
+    const lx = AREA.x1 - 64, ly = AREA.y1 - 52;
+    const items: [string, Parameters<Painter['rect']>[4], string][] = [
+      ['RCC', { fill: POCHE }, ''],
+      ['BRICK', { fill: BRICK, stroke: INK, sw: W.THIN }, 'h'],
+      ['PCC', { fill: PCC, stroke: INK, sw: W.THIN }, 'd'],
+      ['HARDCORE', { fill: HARDCORE, stroke: INK, sw: W.THIN }, 'o'],
+      ['SCREED / FINISH', { fill: FINISH, stroke: INK, sw: W.THIN }, ''],
+      ['EARTH FILL', { fill: mix(PAPER, '#c9c2b2', 0.5), stroke: INK, sw: W.THIN }, ''],
+    ];
+    pt.text(lx, ly - 2, 'MATERIALS IN SECTION', { size: 1.4, weight: 600, spacing: 0.2 });
+    items.forEach(([name, st2, mark], i) => {
+      const y = ly + i * 4.2;
+      pt.rect(lx, y, 7, 3, st2);
+      if (mark === 'h') for (let c = 0.9; c < 10; c += 0.9) { const xa = Math.max(lx, lx + c - 3), xb = Math.min(lx + 7, lx + c); if (xb > xa) pt.line(xa, y + 3 - (xa - (lx + c - 3)), xb, y + 3 - (xb - (lx + c - 3)), { stroke: INK, sw: W.THIN * 0.7 }); }
+      if (mark === 'd') for (let x = lx + 0.6, k = 0; x < lx + 7; x += 0.9, k++) pt.circle(x, y + 1.1 + (k % 2) * 0.8, 0.09, { fill: INK });
+      if (mark === 'o') for (let x = lx + 1.2; x < lx + 7; x += 1.8) pt.circle(x, y + 1.5, 0.5, { stroke: INK, sw: W.THIN * 0.7 });
+      pt.text(lx + 9, y + 2.3, name, { size: 1.4, font: 'mono' });
+    });
+  }
 
   // dims, levels, grid
   const left = Math.min(X(lo), X(hi)), rightX = Math.max(X(lo), X(hi));
   const top = roofZ + MUMTY_HEIGHT + SLAB;
   const zs = [...new Set([0, ...ffls, roofZ + PARAPET, top].map((z) => Math.round(z * 1000)))].sort((a, b) => a - b).map((z) => z / 1000);
-  chainDim(pt, 'v', zs.map(Y), zs, left - 14, left);
+  chainDim(pt, 'v', zs.map(Y), zs, Math.min(left, X(gLo), X(gHi)) - 7, left);
   ffls.forEach((z, i) => levelMark(pt, rightX + 20, Y(z), levelText(z), 'right', i < levels.length ? (i === 0 ? 'FFL GROUND' : `FFL LEVEL ${i}`) : 'TOS ROOF'));
   levelMark(pt, rightX + 20, Y(0), '±0.000', 'right', 'NGL');
   levelMark(pt, rightX + 20, Y(top), levelText(top), 'right', 'STAIR HEAD');
