@@ -6,7 +6,7 @@ import { area, centroid, cutAround, inset, ramp, uniqueEdges, voronoiCells } fro
 
 export const chroma: FacadeType = {
   id: 'chroma',
-  num: 2,
+  num: 15,
   name: 'Chromatic Voronoi glass',
   description: 'Translucent coloured glass cells on a slim white frame, the colour drifting across the house like light through a prism. The glass is cut crisply round every window and door, so views and daylight stay untinted while the walls glow.',
   params: [

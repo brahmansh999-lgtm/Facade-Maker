@@ -4,8 +4,8 @@ import { voronoi } from './voronoi.ts';
 import { flow } from './flow.ts';
 import { chroma } from './chroma.ts';
 import { vweb } from './vweb.ts';
-import { bubbles } from './bubbles.ts';
-import { mosaic } from './mosaic.ts';
+import { living } from './living.ts';
+import { baguettes } from './baguettes.ts';
 import { fins } from './fins.ts';
 import { aerofoil } from './aerofoil.ts';
 import { diagrid } from './diagrid.ts';
@@ -17,7 +17,7 @@ import { eggcrate } from './eggcrate.ts';
 import { garden } from './garden.ts';
 
 export const FACADES: FacadeType[] = [
-  voronoi, chroma, vweb, flow, bubbles, mosaic, dichroic, ribbons, fins, aerofoil, diagrid, perforated, hex, eggcrate, garden,
+  voronoi, vweb, flow, living, baguettes, garden, dichroic, ribbons, fins, aerofoil, diagrid, perforated, hex, eggcrate, chroma,
 ];
 
 const byId = new Map(FACADES.map((f) => [f.id, f]));

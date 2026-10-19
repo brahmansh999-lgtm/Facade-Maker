@@ -6,7 +6,7 @@ import { uniqueEdges, voronoiCells } from './voronoi.ts';
 
 export const vweb: FacadeType = {
   id: 'vweb',
-  num: 3,
+  num: 2,
   name: 'Voronoi web screen',
   description: 'A free-standing lattice of Voronoi members, like bone or a leaf skeleton, held off the wall. Members thicken towards the ground where the loads gather and thin out as they rise; the web passes in front of windows only as an open screen and always stops at doors.',
   params: [

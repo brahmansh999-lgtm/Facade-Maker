@@ -6,7 +6,7 @@ import { mix } from '../drawings/color.ts';
 
 export const garden: FacadeType = {
   id: 'garden',
-  num: 15,
+  num: 6,
   name: 'Vertical garden net',
   description: 'White GRC planter ledges cantilever off every slab band, strung with a stainless cable net on the grid rhythm. Climbers grow up (or trail down) the net and are trained away from windows and doors.',
   params: [

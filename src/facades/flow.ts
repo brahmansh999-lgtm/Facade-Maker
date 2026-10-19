@@ -6,7 +6,7 @@ const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 export const flow: FacadeType = {
   id: 'flow',
-  num: 4,
+  num: 3,
   name: 'Fluid flow lines',
   description: 'Continuous aluminium fins that run the full height of the house like streamlines in water: they part around every window and door and close up again beyond it, with a slow meander and a depth swell travelling across the face. Spacing tightens on the hot faces.',
   params: [
