@@ -1,7 +1,7 @@
 export const INK = '#1b1a17';
 export const PAPER = '#f2efe8';
 export const ACCENT = '#a33b20';
-export const GLASS = '#b9c0bd';
+export const GLASS = '#cfe0e4';
 export const GLASS_DARK = '#59625f';
 
 export function hexToRgb(hex: string): [number, number, number] {

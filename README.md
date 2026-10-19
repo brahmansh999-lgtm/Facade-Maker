@@ -5,7 +5,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 ## What it can do
 
 ### 1. 3D view
-- Opens on a rotatable 3D axonometric of the whole house: walls, slabs, parapet, stair head-room and the chosen facade.
+- Opens on a rotatable 3D axonometric of the whole house: walls, slabs, parapet, stair head-room and the chosen facade, with see-through framed glazing showing the furnished rooms inside.
 - Drawn the way an architect draws: flat tones and crisp outlines, no glossy rendering.
 - Orbit, pan and zoom; save the view as a PNG.
 
@@ -14,6 +14,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 - Living spaces face the street, bedrooms sit above, and the stair and bathrooms stack on one core.
 - Edit the plan by hand: drag walls (they snap to 150 mm and the structural grid), split and merge rooms, change room types, move the stair, and resize or remove any window or door.
 - Shows each room's area and the total built-up area as you edit.
+- Every room is furnished automatically to suit its type and size (beds, wardrobes, sofas, dining sets, kitchen runs, desks, bathroom fittings), kept clear of door swings and windows, and re-planned whenever the layout changes.
 - Proper floor plans: solid cut walls, door swings, window cills, stair arrows with riser count, grid bubbles, dimensions, levels and a north arrow.
 - A site and roof plan shows setbacks, parking bays, roof falls and outlets.
 

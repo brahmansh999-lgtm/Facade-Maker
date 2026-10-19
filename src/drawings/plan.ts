@@ -11,6 +11,7 @@ import { primBox, boxAsPrism } from './primDraw.ts';
 import { View, W, type Painter } from './painter.ts';
 import { ACCENT, INK, PAPER, mix, shade } from './color.ts';
 import { AREA, fitScale } from './sheet.ts';
+import { drawFurniture } from './furniturePlan.ts';
 import { TXT, bubble, chainDim, northArrow, runningDim, scaleBar, sectionMark } from './annot.ts';
 
 export const POCHE = '#2b2a27';
@@ -86,6 +87,7 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
     pt.text(cx, cy, 'DOUBLE HEIGHT OVER', { size: TXT.small, anchor: 'middle', spacing: 0.15 });
   }
   pt.end();
+  drawFurniture(pt, v, L.furniture);
 
   // ---- grid
   const g = gridLines(d.project);
@@ -144,6 +146,9 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
     if (rot) {
       pt.text(cx + 0.6, cy, r.name, { size: nameSize, anchor: 'middle', weight: 600, rotate: -90, spacing: 0.12 });
     } else {
+      // soft backing so names stay legible over furniture
+      const bw = r.name.length * nameSize * 0.72 + 2, bh = big ? 8.2 : 5;
+      pt.rect(cx - bw / 2, cy - (big ? 1.2 : 0) - nameSize - 0.6, bw, bh, { fill: FILL[r.type] ?? PAPER, opacity: 0.82 });
       pt.text(cx, cy - (big ? 1.2 : 0), r.name, { size: nameSize, anchor: 'middle', weight: 600, spacing: 0.12 });
       if (big && r.type !== 'void' && r.type !== 'shaft') {
         pt.text(cx, cy + 1.9, `${A.toFixed(2)} m²`, { size: TXT.small, anchor: 'middle', font: 'mono' });

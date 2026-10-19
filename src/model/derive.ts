@@ -11,8 +11,9 @@ import type { FacadeOutput, FacadeType, Orientation, Palette } from '../facades/
 import type { ParamSet } from './types.ts';
 import { checkFacade, type FacadeIssue } from '../facades/validate.ts';
 import { validate } from './validators.ts';
+import { furnishRoom, type Furn } from '../geometry/furniture.ts';
 
-export interface LevelDerived { level: Level; walls: Wall[]; openings: Opening[]; clear: Map<string, Rect> }
+export interface LevelDerived { level: Level; walls: Wall[]; openings: Opening[]; clear: Map<string, Rect>; furniture: Furn[] }
 
 export interface FaceDerived {
   face: Face;
@@ -100,7 +101,8 @@ export function derive(p0: Project): Derived {
     const walls = deriveWalls(level);
     const openings = deriveOpenings(level, walls, keyFor, p.site.latitude, p.openingOverrides);
     const clear = new Map(level.rooms.map((r) => [r.id, clearRect(r, walls)]));
-    return { level, walls, openings, clear };
+    const furniture = level.rooms.flatMap((r) => furnishRoom(r, clear.get(r.id)!, openings));
+    return { level, walls, openings, clear, furniture };
   });
   const openings = levels.flatMap((l) => l.openings);
   tagOpenings(openings);

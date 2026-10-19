@@ -6,14 +6,32 @@ import { EXT_WALL, MUMTY_HEIGHT, PARAPET, SLAB } from '../model/units.ts';
 import { subtract, type Rect } from '../geometry/rect.ts';
 import { SIDES } from '../geometry/faces.ts';
 import { GeoBuilder } from './primMeshes.ts';
-import { GLASS_DARK } from '../drawings/color.ts';
 
-const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: GLASS_DARK, door: '#a88866', mumty: '#ddd8cc' };
+const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: '#9cc3cf', frame: '#3b3f42', door: '#a88866', mumty: '#ddd8cc', furn: '#d9d1c1', soft: '#c9bfae', wet: '#e9edec' };
+const GLASS_OPACITY = 0.28;
 
 /** plan rect + height range → world box (X = x, Y = z, Z = −y) */
-function pbox(gb: GeoBuilder, x0: number, y0: number, x1: number, y1: number, z0: number, z1: number, hex: string, edges = true) {
-  gb.box(new THREE.Vector3(Math.min(x0, x1), z0, -Math.max(y0, y1)), new THREE.Vector3(Math.max(x0, x1), z1, -Math.min(y0, y1)), hex, 1, edges);
+function pbox(gb: GeoBuilder, x0: number, y0: number, x1: number, y1: number, z0: number, z1: number, hex: string, edges = true, opacity = 1) {
+  gb.box(new THREE.Vector3(Math.min(x0, x1), z0, -Math.max(y0, y1)), new THREE.Vector3(Math.max(x0, x1), z1, -Math.min(y0, y1)), hex, opacity, edges);
 }
+
+/** a glazed opening: slim frame on four sides and a see-through pane (plan along s, wall at c) */
+function glazing(gb: GeoBuilder, run: 'x' | 'y', c: number, a: number, b: number, z0: number, z1: number) {
+  const f = 0.05, t = 0.035;
+  const put = (s0: number, s1: number, za: number, zb: number, hex: string, edges: boolean, op = 1) => {
+    if (run === 'x') pbox(gb, s0, c - t, s1, c + t, za, zb, hex, edges, op);
+    else pbox(gb, c - t, s0, c + t, s1, za, zb, hex, edges, op);
+  };
+  put(a, a + f, z0, z1, TONE.frame, true);
+  put(b - f, b, z0, z1, TONE.frame, true);
+  put(a + f, b - f, z0, z0 + f, TONE.frame, true);
+  put(a + f, b - f, z1 - f, z1, TONE.frame, true);
+  const n = Math.max(1, Math.ceil((b - a) / 0.9 - 1e-6));
+  for (let i = 1; i < n; i++) { const m = a + ((b - a) * i) / n; put(m - f / 2, m + f / 2, z0 + f, z1 - f, TONE.frame, true); }
+  put(a + f, b - f, z0 + f, z1 - f, TONE.glass, false, GLASS_OPACITY);
+}
+
+const FURN_TONE: Partial<Record<string, string>> = { sofa: TONE.soft, armchair: TONE.soft, bed: '#ece6da', shower: TONE.wet, wc: '#f4f4f2', basin: '#f4f4f2', rug: '#d6cdbb', plant: '#a9b49a' };
 
 export function buildHouse(d: Derived): THREE.Group {
   const gb = new GeoBuilder();
@@ -33,7 +51,6 @@ export function buildHouse(d: Derived): THREE.Group {
     const z0 = L.level.elevation;
     const z1 = (d.levels[i + 1]?.level.elevation ?? roofZ) - SLAB;
     for (const w of L.walls) {
-      if (!w.external) continue;
       const t = w.thickness;
       const ops = L.openings.filter((op) => op.wallId === w.id);
       const holes: Rect[] = ops.map((op) => ({ x0: op.center - op.width / 2, x1: op.center + op.width / 2, y0: z0 + op.sill, y1: z0 + op.head }));
@@ -41,13 +58,20 @@ export function buildHouse(d: Derived): THREE.Group {
         if (w.run === 'x') pbox(gb, r.x0, w.c - t / 2, r.x1, w.c + t / 2, r.y0, r.y1, TONE.wall, false);
         else pbox(gb, w.c - t / 2, r.x0, w.c + t / 2, r.x1, r.y0, r.y1, TONE.wall, false);
       }
+      if (!w.external) continue;
       for (const op of ops) {
         const a = op.center - op.width / 2, b = op.center + op.width / 2;
-        const tone = op.kind === 'entrance' ? TONE.door : TONE.glass;
-        const inset = op.kind === 'entrance' ? 0 : 0.03;
-        if (w.run === 'x') pbox(gb, a, w.c - 0.01 + inset, b, w.c + 0.01 + inset, z0 + op.sill, z0 + op.head, tone);
-        else pbox(gb, w.c - 0.01, a, w.c + 0.01, b, z0 + op.sill, z0 + op.head, tone);
+        if (op.kind === 'entrance') {
+          if (w.run === 'x') pbox(gb, a, w.c - 0.02, b, w.c + 0.02, z0 + op.sill, z0 + op.head, TONE.door);
+          else pbox(gb, w.c - 0.02, a, w.c + 0.02, b, z0 + op.sill, z0 + op.head, TONE.door);
+        } else if (op.kind !== 'opening') glazing(gb, w.run, w.c, a, b, z0 + op.sill, z0 + op.head);
       }
+    }
+    // furniture as simple blocks, seen through the glass
+    for (const f of L.furniture) {
+      const r = f.r;
+      const h = f.kind === 'chair' ? 0.45 : f.h;
+      pbox(gb, r.x0 + 0.01, r.y0 + 0.01, r.x1 - 0.01, r.y1 - 0.01, z0, z0 + Math.max(0.01, h), FURN_TONE[f.kind] ?? TONE.furn, f.kind !== 'rug');
     }
     // slab over this level
     pbox(gb, o.x0, o.y0, o.x1, o.y1, z1, z1 + SLAB, TONE.slab);

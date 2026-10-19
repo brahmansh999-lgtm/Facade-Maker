@@ -79,8 +79,12 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
       const leaves = Math.max(1, Math.ceil(w / 0.75 - 1e-6));
       for (let i = 1; i < leaves; i++) pt.line(X(op.u0 + (w * i) / leaves), Y(op.z0 + 0.05), X(op.u0 + (w * i) / leaves), Y(op.z1 - 0.05), { stroke: INK, sw: W.THIN });
       if (h > 1.7) pt.line(X(op.u0 + 0.05), Y(op.z1 - 0.5), X(op.u1 - 0.05), Y(op.z1 - 0.5), { stroke: INK, sw: W.THIN });
-      // glazing reflection hint
-      if (!o.simple) pt.line(X(op.u0 + w * 0.2), Y(op.z0 + h * 0.25), X(op.u0 + w * 0.45), Y(op.z0 + h * 0.75), { stroke: shade(GLASS, -0.4), sw: W.THIN });
+      // see-through glass: the room's soffit shadow behind, two soft reflections across the pane
+      if (!o.simple) {
+        R(op.u0 + 0.05, op.z1 - Math.min(0.35, h * 0.25), op.u1 - 0.05, op.z1 - 0.05, { fill: shade(GLASS, -0.18), opacity: 0.55 });
+        pt.line(X(op.u0 + w * 0.15), Y(op.z0 + h * 0.2), X(op.u0 + w * 0.42), Y(op.z0 + h * 0.8), { stroke: '#ffffff', sw: 0.35, opacity: 0.8 });
+        pt.line(X(op.u0 + w * 0.3), Y(op.z0 + h * 0.2), X(op.u0 + w * 0.45), Y(op.z0 + h * 0.52), { stroke: '#ffffff', sw: 0.2, opacity: 0.7 });
+      }
       // cill
       R(op.u0 - 0.05, op.z0 - 0.04, op.u1 + 0.05, op.z0, { fill: shade(WALL_TONE, 0.12), stroke: INK, sw: W.BEYOND });
     }
