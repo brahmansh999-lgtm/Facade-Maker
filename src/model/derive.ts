@@ -2,7 +2,7 @@
 import type { FaceKey, Level, Project, Side, Warning } from './types.ts';
 import { deriveWalls, type Wall } from '../geometry/walls.ts';
 import { deriveOpenings, tagOpenings, clearRect, type Opening } from '../geometry/openings.ts';
-import { SIDES, buildFaceShell, faceKeyOf, footprint, outerRect, toU, type Face, type FaceOpening } from '../geometry/faces.ts';
+import { SIDES, buildFaceShell, faceKeyOf, footprint, outerRect, toD, toU, type Face, type FaceOpening } from '../geometry/faces.ts';
 import { computeStair, type StairCalc } from '../geometry/stair.ts';
 import { polyOf, roomRect, area, type Rect } from '../geometry/rect.ts';
 import { faceSun, type FaceSun } from './solar.ts';
@@ -12,6 +12,9 @@ import type { ParamSet } from './types.ts';
 import { checkFacade, type FacadeIssue } from '../facades/validate.ts';
 import { validate } from './validators.ts';
 import { furnishRoom, type Furn } from '../geometry/furniture.ts';
+import { applyMassing, levelOutline } from '../geometry/massing.ts';
+import { isPlanar, runZoned } from '../facades/zones.ts';
+import { EXT_WALL } from './units.ts';
 
 export interface LevelDerived { level: Level; walls: Wall[]; openings: Opening[]; clear: Map<string, Rect>; furniture: Furn[] }
 
@@ -30,6 +33,8 @@ export interface Derived {
   project: Project;
   footprint: Rect;
   outer: Rect;
+  /** outer wall face rectangle of every level (differs per level with massing moves) */
+  outlines: Rect[];
   levels: LevelDerived[];
   openings: Opening[];
   stair: StairCalc;
@@ -46,6 +51,25 @@ export function syncStair(p: Project): Level[] {
   return p.levels.map((l) => ({ ...l, rooms: l.rooms.map((r) => (r.type === 'stair' ? { ...r, polygon: poly } : r)) }));
 }
 
+/** a storey that steps back over the one below gets a glazed door out onto that terrace */
+function terraceDoor(p: Project, level: Level, openings: Opening[]) {
+  const i = p.levels.indexOf(level);
+  if (i < 1) return;
+  const up = levelOutline(level), lo = levelOutline(p.levels[i - 1]);
+  if (lo.y1 - up.y1 < 0.3) return;
+  const rank: Record<string, number> = { family: 3, living: 3, bedroom: 2, study: 1 };
+  const pick = openings
+    .filter((o) => o.kind === 'window' && o.side === 'rear' && rank[level.rooms.find((r) => r.id === o.roomId)?.type ?? ''])
+    .sort((a, b) => rank[level.rooms.find((r) => r.id === b.roomId)!.type] - rank[level.rooms.find((r) => r.id === a.roomId)!.type] || b.width - a.width)[0];
+  if (!pick) return;
+  pick.kind = 'garden';
+  pick.sill = 0;
+  pick.head = Math.max(pick.head, 2.4);
+  pick.leaves = pick.width >= 1.2 ? 2 : 1;
+  const a = pick.width * (pick.head - pick.sill);
+  pick.glazedArea = a * 0.7; pick.ventArea = a * 0.5;
+}
+
 export function faceOpenings(face: Face, levels: LevelDerived[]): FaceOpening[] {
   const out: FaceOpening[] = [];
   for (const L of levels) {
@@ -59,6 +83,7 @@ export function faceOpenings(face: Face, levels: LevelDerived[]): FaceOpening[] 
         id: o.id, tag: o.tag, kind: o.kind, u0: Math.min(u0, u1), u1: Math.max(u0, u1),
         z0: L.level.elevation + o.sill, z1: L.level.elevation + o.head, levelIndex: L.level.index,
         reqRatio: o.reqRatio, door: o.kind === 'entrance' || o.kind === 'garden', roomName: room?.name ?? '',
+        inset: Math.max(0, -(toD(face, p0[0], p0[1]) + EXT_WALL / 2)),
       });
     }
   }
@@ -71,7 +96,7 @@ export function runFacade(type: FacadeType, face: Face, orient: Orientation, par
   const key = JSON.stringify([type.id, face, orient, params, palette]);
   const hit = memo.get(key);
   if (hit) return hit;
-  const out = type.generate(face, face.openings, face.levels, orient, params, palette);
+  const out = isPlanar(face) ? type.generate(face, face.openings, face.levels, orient, params, palette) : runZoned(type, face, orient, params, palette);
   memo.set(key, out);
   if (memo.size > 120) memo.delete(memo.keys().next().value!);
   return out;
@@ -95,11 +120,12 @@ export function settingFor(p: Project, key: FaceKey) {
 }
 
 export function derive(p0: Project): Derived {
-  const p: Project = { ...p0, levels: syncStair(p0) };
+  const p: Project = { ...p0, levels: applyMassing(syncStair(p0), p0.massing ?? { cantilever: 0, terrace: 0, lid: 0 }) };
   const keyFor = (s: Side) => faceKeyOf(s, p.site.northAngle);
   const levels: LevelDerived[] = p.levels.map((level) => {
     const walls = deriveWalls(level);
     const openings = deriveOpenings(level, walls, keyFor, p.site.latitude, p.openingOverrides);
+    terraceDoor(p, level, openings);
     const clear = new Map(level.rooms.map((r) => [r.id, clearRect(r, walls)]));
     const furniture = level.rooms.flatMap((r) => furnishRoom(r, clear.get(r.id)!, openings));
     return { level, walls, openings, clear, furniture };
@@ -129,8 +155,9 @@ export function derive(p0: Project): Derived {
     faces[s] = { face, type: st.type, params: st.params, palette: st.palette, orient, out, issues: checkFacade(face, out), overridden: st.overridden };
   }
   const o = outerRect(fp);
-  const builtUp = levels.length * area(o) + (stair ? (sp.w + 0.23) * (sp.h + 0.23) : 0);
-  const d: Derived = { project: p, footprint: fp, outer: o, levels, openings, stair, faces, sun, warnings: [], builtUp };
+  const outlines = p.levels.map(levelOutline);
+  const builtUp = outlines.reduce((sum, r) => sum + area(r), 0) + (stair ? (sp.w + 0.23) * (sp.h + 0.23) : 0);
+  const d: Derived = { project: p, footprint: fp, outer: o, outlines, levels, openings, stair, faces, sun, warnings: [], builtUp };
   d.warnings = validate(d);
   return d;
 }

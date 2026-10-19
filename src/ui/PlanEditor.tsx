@@ -28,12 +28,16 @@ export function PlanEditor() {
     const key = `edge-${Date.now()}`;
     const svgEl = svgRef.current!;
     const axis = edge[0] as 'x' | 'y';
+    // the plan shows rooms after massing moves; edits apply to the base layout
+    const shown = d.levels[li].level.rooms.find((x) => x.id === roomId);
+    const base = useStore.getState().project.levels[li].rooms.find((x) => x.id === roomId);
+    const shift = shown && base ? roomRect(shown)[edge] - roomRect(base)[edge] : 0;
     const move = (ev: PointerEvent) => {
       const [sx, sy] = toSheet(svgEl, ev.clientX, ev.clientY);
       const m = axis === 'x' ? (sx - v.ox) / v.k : (v.oy - sy) / v.k;
       const p = useStore.getState().project;
       const t = snapCoord(p, axis, m);
-      commit((pp) => moveEdge(pp, li, roomId, edge, t), key);
+      commit((pp) => moveEdge(pp, li, roomId, edge, t - shift), key);
       const r = useStore.getState().project.levels[li].rooms.find((x) => x.id === roomId);
       if (r) {
         const b = roomRect(r);

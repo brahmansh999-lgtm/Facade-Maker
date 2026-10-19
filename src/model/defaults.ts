@@ -1,4 +1,4 @@
-import type { Brief, ElevationSetting, FaceKey, FacadeState, Project, Site, StairSpec } from './types.ts';
+import type { Brief, ElevationSetting, Massing, FaceKey, FacadeState, Project, Site, StairSpec } from './types.ts';
 import { solveLayout } from './layout.ts';
 import { FACADES, defaultParams, getFacade, hasFacade } from '../facades/registry.ts';
 
@@ -20,6 +20,8 @@ export const DEFAULT_BRIEF: Brief = {
   floorToFloor: 3.2,
   plinth: 0.45,
 };
+
+export const DEFAULT_MASSING: Massing = { cantilever: 1.2, terrace: 0, lid: 0.6 };
 
 export function defaultFacade(active = 'voronoi'): FacadeState {
   const t = getFacade(active);
@@ -45,6 +47,7 @@ export function defaultProject(): Project {
     stair: lay.stair,
     facade: defaultFacade(),
     openingOverrides: {},
+    massing: { ...DEFAULT_MASSING },
     unplaced: lay.unplaced,
   };
 }
@@ -78,6 +81,7 @@ export function normaliseProject(p: Project): Project {
     f.perElevation[k] = e;
   }
   p.openingOverrides ??= {};
+  p.massing = { ...DEFAULT_MASSING, ...(p.massing ?? {}) };
   p.unplaced ??= [];
   return p;
 }

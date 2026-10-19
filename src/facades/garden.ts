@@ -35,7 +35,7 @@ export const garden: FacadeType = {
     const doors = c.doorRects(0.3);
     const keepClear = c.openRects(0.12);
     // planters: plinth bed + one ledge per slab band, hung below the slab top
-    const ledges: { z0: number; z1: number }[] = [{ z0: 0, z1: c.bottom }];
+    const ledges: { z0: number; z1: number }[] = [{ z0: face.groundZ, z1: c.bottom }];
     for (const l of face.levels.slice(1)) ledges.push({ z0: l.ffl - ph, z1: l.ffl + 0.05 });
     ledges.push({ z0: face.roofZ - ph, z1: face.roofZ + 0.05 });
     let pl = 0;

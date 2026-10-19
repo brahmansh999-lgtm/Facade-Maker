@@ -2,7 +2,7 @@ import type { Warning } from './types.ts';
 import type { Derived } from './derive.ts';
 import { EXT_WALL, INT_WALL } from './units.ts';
 import { HABITABLE } from '../geometry/openings.ts';
-import { area, overlap, roomRect, rw, rh } from '../geometry/rect.ts';
+import { area, overlap, roomRect, rw, rh, union } from '../geometry/rect.ts';
 import { gridLines } from '../geometry/faces.ts';
 import { MAX_RISER, MIN_TREAD } from '../geometry/stair.ts';
 
@@ -53,7 +53,7 @@ export function validate(d: Derived): Warning[] {
       if (overlap(rs[i].b, rs[j].b) > 0.01) push({ code: 'overlap', severity: 'fail', level: lv, ref: rs[i].r.id, message: `${rs[i].r.name} overlaps ${rs[j].r.name}` });
     }
     const sum = rs.reduce((s, x) => s + area(x.b), 0);
-    const fpA = area(d.footprint);
+    const fpA = area(union(rs.map((x) => x.b)));
     if (sum < fpA - 0.05) push({ code: 'gap', severity: 'warn', level: lv, message: `L${lv}: ${f2(fpA - sum)} m² of the footprint is not assigned to a room` });
     // walls are generated to rule; this guards the derivation itself
     if (L.walls.some((w) => w.thickness !== (w.external ? EXT_WALL : INT_WALL))) push({ code: 'wall', severity: 'fail', level: lv, message: 'Wall thickness does not follow 230 ext. / 115 int.' });
@@ -82,14 +82,18 @@ export function validate(d: Derived): Warning[] {
   const g = gridLines(p);
   p.grid.xBays.forEach((b, i) => { if (b > 5.5 + 1e-6) push({ code: 'span', severity: 'warn', message: `Span ${g.xs[i].label}–${g.xs[i + 1].label} is ${f2(b)} m (> 5.50)` }); });
   p.grid.yBays.forEach((b, i) => { if (b > 5.5 + 1e-6) push({ code: 'span', severity: 'warn', message: `Span ${g.ys[i].label}–${g.ys[i + 1].label} is ${f2(b)} m (> 5.50)` }); });
-  const fp = d.footprint;
+  const fp = d.levels[0] ? union(d.levels[0].level.rooms.map(roomRect)) : d.footprint;
   const gx0 = g.xs[0].v, gx1 = g.xs[g.xs.length - 1].v, gy0 = g.ys[0].v, gy1 = g.ys[g.ys.length - 1].v;
   if ([gx0 - fp.x0, gx1 - fp.x1, gy0 - fp.y0, gy1 - fp.y1].some((v) => Math.abs(v) > 0.01)) {
     push({ code: 'grid', severity: 'fail', message: 'Footprint corners are off the structural grid — columns would not land on grid' });
   }
 
   // ---- site
-  const o = d.outer, sb = p.site.setbacks;
+  const o = d.outlines[0] ?? d.outer, sb = p.site.setbacks;
+  // upper-floor projections (cantilevers, lids) may reach 1.5 m into a setback
+  const PROJ = 1.5;
+  const up = d.outer;
+  if (up.y0 < sb.front - PROJ - 1e-3) push({ code: 'setback', severity: 'fail', message: `Cantilever reaches ${f2(sb.front - up.y0)} m into the front setback (max ${PROJ})` });
   if (o.x0 < sb.left - 1e-3) push({ code: 'setback', severity: 'fail', message: `Left setback breached by ${f2(sb.left - o.x0)} m` });
   if (o.x1 > p.site.width - sb.right + 1e-3) push({ code: 'setback', severity: 'fail', message: `Right setback breached by ${f2(o.x1 - (p.site.width - sb.right))} m` });
   if (o.y0 < sb.front - 1e-3) push({ code: 'setback', severity: 'fail', message: `Front setback breached by ${f2(sb.front - o.y0)} m` });
@@ -98,11 +102,6 @@ export function validate(d: Derived): Warning[] {
     if (sb.front < 5.5) push({ code: 'parking', severity: 'warn', message: `Front setback ${f2(sb.front)} m is too short for a 5.0 m car bay + 0.5 m` });
     if (p.brief.parking * 2.7 > p.site.width - 1.0) push({ code: 'parking', severity: 'warn', message: `${p.brief.parking} car bays (2.7 m) do not fit the frontage` });
   }
-  const fps = d.levels.map((L) => L.level.rooms.map(roomRect).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) })));
-  if (fps.some((r) => Math.abs(r.x0 - fps[0].x0) + Math.abs(r.x1 - fps[0].x1) + Math.abs(r.y0 - fps[0].y0) + Math.abs(r.y1 - fps[0].y1) > 0.01)) {
-    push({ code: 'massing', severity: 'warn', message: 'Upper level outline differs from ground — elevations assume planar faces' });
-  }
-
   // ---- facade
   for (const side of ['front', 'right', 'rear', 'left'] as const) {
     const f = d.faces[side];

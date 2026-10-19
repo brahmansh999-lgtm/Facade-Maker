@@ -33,6 +33,22 @@ export interface FaceOpening {
   reqRatio: number;
   door: boolean;
   roomName: string;
+  /** how far this opening's wall sits behind the face plane (m) */
+  inset?: number;
+}
+
+/**
+ * A stretch of one face where the wall is a single plane: consecutive storeys that share
+ * extent and set-back. Facades are generated per zone so the skin follows the massing.
+ */
+export interface FaceZone {
+  u0: number; u1: number;
+  /** clad height: bottom (plinth top or soffit) to top (next soffit, terrace edge or parapet) */
+  z0: number; z1: number;
+  /** wall plane behind the face plane, m (≥ 0) */
+  inset: number;
+  levels: number[];
+  roof: boolean;
 }
 
 export interface Face {
@@ -50,6 +66,7 @@ export interface Face {
   parapetTop: number;
   gridU: { u: number; label: string }[];
   openings: FaceOpening[];
+  zones: FaceZone[];
   /** stair head-room enclosure above roof, in face coords; dist = set-back from this face */
   mumty: { u0: number; u1: number; z0: number; z1: number; dist: number } | null;
 }
@@ -96,6 +113,7 @@ export function buildFaceShell(p: Project, side: Side): Omit<Face, 'openings'> {
   const fp = footprint(p);
   const o = outerRect(fp);
   const fr = faceFrame(side, o);
+  const zones = faceZones(p, side, fr, o);
   const levels = p.levels.map((l) => ({ index: l.index, ffl: l.elevation, slabBottom: l.elevation - SLAB }));
   const rz = roofZ(p);
   const g = gridLines(p);
@@ -108,7 +126,33 @@ export function buildFaceShell(p: Project, side: Side): Omit<Face, 'openings'> {
   return {
     side, key: faceKeyOf(side, p.site.northAngle), bearing: bearingOf(side, p.site.northAngle),
     width: fr.width, O: fr.O, U: fr.U, N: fr.N, groundZ: 0, plinthTop: p.brief.plinth, levels,
-    roofZ: rz, parapetTop: rz + PARAPET, gridU: lines.sort((a, b) => a.u - b.u),
+    roofZ: rz, parapetTop: rz + PARAPET, gridU: lines.sort((a, b) => a.u - b.u), zones,
     mumty: { u0: Math.min(...us), u1: Math.max(...us), z0: rz, z1: rz + 2.7 + SLAB, dist: -Math.max(...ds) },
   };
+}
+
+/** per-level wall plane and extent on this face, grouped into zones bottom → top */
+function faceZones(p: Project, side: Side, fr: { O: Vec2; U: Vec2; N: Vec2 }, o: Rect): FaceZone[] {
+  const rz = roofZ(p);
+  const per = p.levels.map((l) => {
+    const r = outerRect(union(l.rooms.map(roomRect)));
+    const us = [toU(fr, r.x0, r.y0), toU(fr, r.x1, r.y1)];
+    const inset = side === 'front' ? r.y0 - o.y0 : side === 'rear' ? o.y1 - r.y1 : side === 'left' ? r.x0 - o.x0 : o.x1 - r.x1;
+    return { u0: Math.min(...us), u1: Math.max(...us), inset: Math.max(0, inset) };
+  });
+  const same = (a: (typeof per)[number], b: (typeof per)[number]) => Math.abs(a.u0 - b.u0) + Math.abs(a.u1 - b.u1) + Math.abs(a.inset - b.inset) < 1e-3;
+  const groups: { lv: number[]; g: (typeof per)[number] }[] = [];
+  per.forEach((g, i) => {
+    const last = groups[groups.length - 1];
+    if (last && same(last.g, g)) last.lv.push(i); else groups.push({ lv: [i], g });
+  });
+  const ffl = (i: number) => p.levels[i].elevation;
+  // the slab at a step belongs to whichever storey is larger (a cantilever's floor, a terrace's deck)
+  const upperWins = (lo: (typeof per)[number], up: (typeof per)[number]) => up.u0 <= lo.u0 + 1e-3 && up.u1 >= lo.u1 - 1e-3 && up.inset <= lo.inset + 1e-3;
+  return groups.map(({ lv, g }, k) => {
+    const prev = groups[k - 1], next = groups[k + 1];
+    const z0 = !prev ? p.brief.plinth : upperWins(prev.g, g) ? ffl(lv[0]) - SLAB : ffl(lv[0]);
+    const z1 = !next ? rz + PARAPET : upperWins(g, next.g) ? ffl(next.lv[0]) - SLAB : ffl(next.lv[0]);
+    return { u0: g.u0, u1: g.u1, z0, z1, inset: g.inset, levels: lv, roof: !next };
+  });
 }

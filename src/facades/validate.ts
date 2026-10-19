@@ -24,7 +24,7 @@ export function checkFacade(face: Face, out: FacadeOutput): FacadeIssue[] {
       let issue: FacadeIssue | null = null;
       if (o.door) issue = { openingTag: o.tag, kind: 'door', detail: `element in front of door ${o.tag}` };
       else if (p.role === 'solid') issue = { openingTag: o.tag, kind: 'covers', detail: `solid ${p.kind} covers ${o.tag}` };
-      else if (b.d0 < 0.04) issue = { openingTag: o.tag, kind: 'offset', detail: `screen at ${Math.round(b.d0 * 1000)} mm off ${o.tag} (min 40)` };
+      else if (b.d0 + (o.inset ?? 0) < 0.04) issue = { openingTag: o.tag, kind: 'offset', detail: `screen at ${Math.round((b.d0 + (o.inset ?? 0)) * 1000)} mm off ${o.tag} (min 40)` };
       else if ((p.porosity ?? 0) + 1e-6 < o.reqRatio) issue = { openingTag: o.tag, kind: 'porosity', detail: `screen ${Math.round((p.porosity ?? 0) * 100)}% open over ${o.tag}, needs ${Math.round(o.reqRatio * 100)}%` };
       if (issue) issues.set(`${o.tag}:${issue.kind}`, issue);
     }

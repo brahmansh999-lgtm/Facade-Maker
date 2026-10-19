@@ -234,6 +234,16 @@ export function Inspector() {
       )}
 
       <section>
+        <h2><span className="sc">Massing</span><span className="mono dim">push · pull</span></h2>
+        <div className="body">
+          <div className="field"><span>Upper-floor cantilever</span><Stepper value={p.massing.cantilever} step={0.15} min={0} max={2.4} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, cantilever: n } }), 'massing-c')} /></div>
+          <div className="field"><span>Top-floor rear terrace</span><Stepper value={p.massing.terrace} step={0.15} min={0} max={3} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, terrace: n } }), 'massing-t')} /></div>
+          <div className="field"><span>Floating roof lid</span><Stepper value={p.massing.lid} step={0.15} min={0} max={1.8} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, lid: n } }), 'massing-l')} /></div>
+          <p className="note">Upper floors push out over a covered porch; the top floor pulls back for a terrace; the lid floats over the parapet. 0 switches a move off. Plans, elevations, section, 3D and facades follow.</p>
+        </div>
+      </section>
+
+      <section>
         <h2 className="collapse" onClick={() => setUI({ briefOpen: !ui.briefOpen })}><span className="sc">{ui.briefOpen ? '▾' : '▸'} Brief &amp; site</span><span className="mono dim">{p.brief.floors}F · {p.brief.bedrooms}BR</span></h2>
         {ui.briefOpen && (
           <div className="body">

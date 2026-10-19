@@ -9,6 +9,7 @@ import { INK, PAPER, mix } from './color.ts';
 import { AREA, fitScale } from './sheet.ts';
 import { TXT, bubble, chainDim, northArrow, scaleBar, sectionMark } from './annot.ts';
 import { sectionLine } from './plan.ts';
+import { terraceStrips } from '../geometry/massing.ts';
 
 export function roofLayout(d: Derived) {
   const s = d.project.site;
@@ -57,11 +58,20 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
   }
   if (ent) {
     // entrance path
-    R(ent.center - 0.6, 0, ent.center + 0.6, d.outer.y0 - 0.9, { stroke: INK, sw: W.BEYOND, dash: [1, 0.8] });
+    R(ent.center - 0.6, 0, ent.center + 0.6, d.outlines[0].y0 - 0.9, { stroke: INK, sw: W.BEYOND, dash: [1, 0.8] });
   }
 
-  // building roof
-  const o = d.outer;
+  // lower roofs left open by stepped storeys: terraces with decking
+  const ol = d.outlines, nl = ol.length;
+  for (let i = 0; i < nl - 1; i++) {
+    for (const t of terraceStrips(ol[i], ol[i + 1])) {
+      R(t.x0, t.y0, t.x1, t.y1, { fill: '#ebe4d4', stroke: INK, sw: W.OUTLINE });
+      for (let x = t.x0 + 0.14; x < t.x1 - 0.02; x += 0.14) pt.line(X(x), Y(t.y0), X(x), Y(t.y1), { stroke: '#cbbfa5', sw: W.THIN * 0.6 });
+      pt.text(X((t.x0 + t.x1) / 2), Y((t.y0 + t.y1) / 2) + 0.5, `TERRACE L${i}`, { size: 1.5, anchor: 'middle', weight: 600, spacing: 0.15 });
+    }
+  }
+  // building roof (top storey)
+  const o = ol[nl - 1];
   R(o.x0, o.y0, o.x1, o.y1, { fill: '#e9e5dc', stroke: INK, sw: W.OUTLINE });
   R(o.x0 + EXT_WALL, o.y0 + EXT_WALL, o.x1 - EXT_WALL, o.y1 - EXT_WALL, { stroke: INK, sw: W.PROJ });
   // falls to two outlets at the rear corners
@@ -79,6 +89,16 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
     pt.poly([X(tx), Y(ty), X(tx) - Math.cos(ang - 0.4) * 2, Y(ty) - Math.sin(ang - 0.4) * 2, X(tx) - Math.cos(ang + 0.4) * 2, Y(ty) - Math.sin(ang + 0.4) * 2], true, { fill: INK });
     pt.text((X(fx) + X(tx)) / 2 + 1.5, (Y(fy) + Y(ty)) / 2, 'FALL 1:100', { size: 1.3, font: 'mono' });
   }
+  // floating roof lid: a brim ring over the parapet
+  const lid = p.massing?.lid ?? 0;
+  if (lid > 0) {
+    const Ox0 = o.x0 - lid, Oy0 = o.y0 - lid, Ox1 = o.x1 + lid, Oy1 = o.y1 + lid, I = 0.6;
+    const ring: [number, number, number, number][] = [[Ox0, Oy0, Ox1, o.y0 + I], [Ox0, o.y1 - I, Ox1, Oy1], [Ox0, o.y0 + I, o.x0 + I, o.y1 - I], [o.x1 - I, o.y0 + I, Ox1, o.y1 - I]];
+    for (const [a, b, c, e] of ring) R(a, b, c, e, { fill: '#f3f1eb' });
+    R(Ox0, Oy0, Ox1, Oy1, { stroke: INK, sw: W.OUTLINE });
+    R(o.x0 + I, o.y0 + I, o.x1 - I, o.y1 - I, { stroke: INK, sw: W.PROJ });
+    pt.text(X(Ox0) + 1, Y(Oy0) - 1, `ROOF LID +${lid.toFixed(2)} OVERHANG`, { size: 1.2, font: 'mono' });
+  }
   // stair head-room
   R(sp.x - EXT_WALL / 2, sp.y - EXT_WALL / 2, sp.x + sp.w + EXT_WALL / 2, sp.y + sp.h + EXT_WALL / 2, { fill: '#dcd7cc', stroke: INK, sw: W.OUTLINE });
   R(sp.x + 0.3, sp.y + 0.3, sp.x + sp.w - 0.3, sp.y + 1.5, { stroke: INK, sw: W.BEYOND, dash: [1, 0.7] });
@@ -91,7 +111,7 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
     const seen = new Set<string>();
     for (const p0 of fd.out.prims) {
       const bb = primBox(p0);
-      if (bb.z1 < fd.face.parapetTop - 0.8 || bb.d1 < 0.01 || p0.kind === 'line' || p0.kind === 'disc') continue;
+      if (bb.z1 < fd.face.parapetTop - 0.8 || bb.d1 + (fd.face.zones[fd.face.zones.length - 1]?.inset ?? 0) < 0.01 || p0.kind === 'line' || p0.kind === 'disc') continue;
       const poly: [number, number][] = p0.kind === 'prismZ' ? p0.pts : p0.kind === 'box' && p0.rot ? boxAsPrism(p0).pts : [[bb.u0, bb.d0], [bb.u1, bb.d0], [bb.u1, bb.d1], [bb.u0, bb.d1]];
       const pts = poly.map(([u, dd]) => toPlan(fd.face, u, dd)).flatMap(([px, py]) => [X(px), Y(py)]);
       const key = pts.map((q) => Math.round(q * 4)).join(',');

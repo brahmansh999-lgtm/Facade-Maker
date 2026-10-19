@@ -70,6 +70,7 @@ function drawPiece(pt: Painter, v: View, f: Furn) {
     case 'counter': {
       box(0, 0, L, D, TOP);
       ln(0, D - 0.04, L, D - 0.04);
+      pt.line(...P(0, 0.35), ...P(L, 0.35), { ...s, dash: [1.2, 0.8] });      // wall units over
       if (L >= 1.4) {
         const sa = Math.min(L - 0.45, Math.max(0.45, L * 0.3));
         box(sa - 0.35, 0.1, sa + 0.35, 0.5, '#fff'); circ(sa, 0.3, 0.025);       // sink
@@ -78,7 +79,7 @@ function drawPiece(pt: Painter, v: View, f: Furn) {
       }
       break;
     }
-    case 'worktop': box(0, 0, L, D, TOP); ln(0, D - 0.04, L, D - 0.04); break;
+    case 'worktop': box(0, 0, L, D, TOP); ln(0, D - 0.04, L, D - 0.04); pt.line(...P(0, 0.35), ...P(L, 0.35), { ...s, dash: [1.2, 0.8] }); break;
     case 'fridge': box(0, 0, L, D, TOP); ln(0.05, D - 0.06, L - 0.05, D - 0.06); ln(0, 0, L, D); break;
     case 'desk': box(0, 0, L, D, TOP); box(L / 2 - 0.23, D + 0.08, L / 2 + 0.23, D + 0.52, TOP); ln(L / 2 - 0.23, D + 0.46, L / 2 + 0.23, D + 0.46); break;
     case 'shelf': { box(0, 0, L, D, TOP); const n = Math.max(1, Math.round(L / 0.8)); for (let i = 1; i < n; i++) ln((L * i) / n, 0, (L * i) / n, D); ln(0, 0, L, D); break; }

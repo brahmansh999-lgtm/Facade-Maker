@@ -9,11 +9,14 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 - Drawn the way an architect draws: flat tones and crisp outlines, no glossy rendering.
 - Orbit, pan and zoom; save the view as a PNG.
 
+- Push and pull the massing: upper floors cantilever over a covered porch, the top floor steps back for a roof terrace with glass balustrade and a terrace door, and a floating roof lid hovers over the parapet. Every drawing and the facade follow the steps.
+
 ### 2. Plans
 - Lays out the house automatically from the brief: floors, bedrooms, bathrooms, studies and parking.
 - Living spaces face the street, bedrooms sit above, and the stair and bathrooms stack on one core.
 - Edit the plan by hand: drag walls (they snap to 150 mm and the structural grid), split and merge rooms, change room types, move the stair, and resize or remove any window or door.
 - Shows each room's area and the total built-up area as you edit.
+- Detailed drawing layer: timber-board and tile floor finishes, room tags with clear ceiling heights, kitchen wall units, covered porch and terrace paving with falls, lines of floors above and below, and the roof lid outline.
 - Every room is furnished automatically to suit its type and size (beds, wardrobes, sofas, dining sets, kitchen runs, desks, bathroom fittings), kept clear of door swings and windows, and re-planned whenever the layout changes.
 - Proper floor plans: solid cut walls, door swings, window cills, stair arrows with riser count, grid bubbles, dimensions, levels and a north arrow.
 - A site and roof plan shows setbacks, parking bays, roof falls and outlets.

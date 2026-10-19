@@ -54,16 +54,27 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
     R(m.u0, m.z0, m.u1, m.z1, { fill: shade(WALL_TONE, 0.06), stroke: INK, sw: W.BEYOND });
     R(m.u0 - 0.05, m.z1 - 0.15, m.u1 + 0.05, m.z1, { fill: shade(WALL_TONE, 0.1), stroke: INK, sw: W.BEYOND });
   }
-  // wall, plinth, bands, parapet coping
-  R(0, f.plinthTop, f.width, f.parapetTop, { fill: WALL_TONE });
-  R(0, 0, f.width, f.plinthTop, { fill: shade(WALL_TONE, 0.16), stroke: INK, sw: W.PROJ });
-  for (const l of f.levels.slice(1)) {
-    pt.line(X(0), Y(l.ffl - BAND), X(f.width), Y(l.ffl - BAND), { stroke: INK, sw: W.BEYOND });
-    pt.line(X(0), Y(l.ffl), X(f.width), Y(l.ffl), { stroke: INK, sw: W.BEYOND });
+  // wall per massing zone (set-back zones a touch darker), plinth, slab bands, parapet coping
+  const zones = f.zones.length ? f.zones : [{ u0: 0, u1: f.width, z0: f.plinthTop, z1: f.parapetTop, inset: 0, levels: f.levels.map((l) => l.index), roof: true }];
+  const z0w = zones[0];
+  for (const z of zones) {
+    R(z.u0, z.z0, z.u1, z.z1, { fill: z.inset > 1e-3 ? shade(WALL_TONE, -0.05) : WALL_TONE });
+    for (const li of z.levels) {
+      const l = f.levels.find((q) => q.index === li);
+      if (!l || l.ffl - BAND <= z.z0 + 1e-3) continue;
+      pt.line(X(z.u0), Y(l.ffl - BAND), X(z.u1), Y(l.ffl - BAND), { stroke: INK, sw: W.BEYOND });
+      pt.line(X(z.u0), Y(l.ffl), X(z.u1), Y(l.ffl), { stroke: INK, sw: W.BEYOND });
+    }
+    if (z.roof) {
+      pt.line(X(z.u0), Y(f.roofZ - BAND), X(z.u1), Y(f.roofZ - BAND), { stroke: INK, sw: W.BEYOND });
+      pt.line(X(z.u0), Y(f.roofZ), X(z.u1), Y(f.roofZ), { stroke: INK, sw: W.BEYOND });
+      R(z.u0 - 0.03, f.parapetTop - 0.075, z.u1 + 0.03, f.parapetTop, { fill: shade(WALL_TONE, 0.1), stroke: INK, sw: W.BEYOND });
+    } else {
+      // slab edge at the step
+      pt.line(X(z.u0), Y(z.z1), X(z.u1), Y(z.z1), { stroke: INK, sw: W.PROJ });
+    }
   }
-  pt.line(X(0), Y(f.roofZ - BAND), X(f.width), Y(f.roofZ - BAND), { stroke: INK, sw: W.BEYOND });
-  pt.line(X(0), Y(f.roofZ), X(f.width), Y(f.roofZ), { stroke: INK, sw: W.BEYOND });
-  R(-0.03, f.parapetTop - 0.075, f.width + 0.03, f.parapetTop, { fill: shade(WALL_TONE, 0.1), stroke: INK, sw: W.BEYOND });
+  R(z0w.u0, 0, z0w.u1, f.plinthTop, { fill: shade(WALL_TONE, 0.16), stroke: INK, sw: W.PROJ });
 
   // openings
   for (const op of f.openings) {
@@ -95,8 +106,37 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
   drawPrims(pt, prims, { X, Y, k }, { line: o.simple ? 0.1 : W.BEYOND, detail: o.simple ? 0 : 1 });
   pt.end();
 
-  // silhouette
-  R(0, 0, f.width, f.parapetTop, { stroke: INK, sw: lineW });
+  // massing: shadow under each cantilever, glass to terraces, the floating roof lid
+  for (let k = 1; k < zones.length; k++) {
+    const lo = zones[k - 1], up = zones[k];
+    if (up.inset < lo.inset - 1e-3 || up.u0 < lo.u0 - 1e-3 || up.u1 > lo.u1 + 1e-3) {
+      const depth = Math.max(0.2, Math.min(0.7, (lo.inset - up.inset) * 0.45 || 0.35));
+      R(Math.max(lo.u0, up.u0), up.z0 - depth, Math.min(lo.u1, up.u1), up.z0, { fill: INK, opacity: 0.13 });
+      pt.line(X(up.u0), Y(up.z0), X(up.u1), Y(up.z0), { stroke: INK, sw: W.PROJ });
+    } else {
+      const zt = lo.z1, runs: [number, number][] = up.inset > lo.inset + 1e-3 ? [[lo.u0, lo.u1]] : [[lo.u0, up.u0], [up.u1, lo.u1]];
+      for (const [a, b] of runs) {
+        if (b - a < 0.05) continue;
+        R(a, zt, b, zt + 1.0, { fill: GLASS, opacity: 0.55, stroke: INK, sw: W.BEYOND });
+        R(a, zt + 0.95, b, zt + 1.0, { fill: shade(INK, -0.2), stroke: INK, sw: W.THIN });
+      }
+    }
+  }
+  const lid = d.project.massing?.lid ?? 0;
+  const zr = zones[zones.length - 1];
+  if (lid > 0) {
+    const zt = f.parapetTop + 0.12;
+    for (const u of [zr.u0 + 0.3, zr.u1 - 0.3]) R(u - 0.05, f.parapetTop, u + 0.05, zt, { fill: shade(INK, -0.3) });
+    R(zr.u0 - lid, zt, zr.u1 + lid, zt + 0.22, { fill: '#f1efe9', stroke: INK, sw: lineW });
+    R(zr.u0 - lid, zt, zr.u1 + lid, zt + 0.04, { fill: INK, opacity: 0.18 });
+  }
+
+  // silhouette, stepping with the massing
+  const sil: number[] = [];
+  sil.push(X(z0w.u0), Y(0));
+  zones.forEach((z, k) => { sil.push(X(z.u0), Y(k ? z.z0 : 0), X(z.u0), Y(z.z1)); });
+  [...zones].reverse().forEach((z, k) => { sil.push(X(z.u1), Y(z.z1), X(z.u1), Y(k === zones.length - 1 ? 0 : z.z0)); });
+  pt.poly(sil, true, { stroke: INK, sw: lineW });
 
   // opening tags + flags
   if (o.tags) for (const op of f.openings) pt.text(X((op.u0 + op.u1) / 2), Y(op.z0) + 3.2, op.tag, { size: 1.4, font: 'mono', anchor: 'middle', fill: shade(INK, -0.3) });

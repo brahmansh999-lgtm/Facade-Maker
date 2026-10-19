@@ -21,7 +21,7 @@ export function storeysOf(face: Face): Storey[] {
 }
 
 export function bandsOf(face: Face): Band[] {
-  const b: Band[] = [{ z0: 0, z1: face.plinthTop, kind: 'plinth' }];
+  const b: Band[] = [{ z0: face.groundZ, z1: face.plinthTop, kind: 'plinth' }];
   face.levels.slice(1).forEach((l) => b.push({ z0: l.ffl - BAND, z1: l.ffl, kind: 'floor' }));
   b.push({ z0: face.roofZ - BAND, z1: face.roofZ, kind: 'roof' });
   b.push({ z0: face.roofZ, z1: face.parapetTop, kind: 'parapet' });

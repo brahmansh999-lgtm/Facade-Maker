@@ -53,7 +53,11 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
     const x0 = Math.min(X(a0), X(a1)), x1 = Math.max(X(a0), X(a1));
     pt.rect(x0, Y(Math.max(z0, z1)), x1 - x0, Math.abs(z1 - z0) * v.k, s);
   };
-  const lo = Math.min(g.a0, g.a1), hi = Math.max(g.a0, g.a1);
+  // extent of each storey along the cut (massing steps show up here)
+  const span = (r: { x0: number; y0: number; x1: number; y1: number }): [number, number] => [Math.min(A(r.x0, r.y0), A(r.x1, r.y1)), Math.max(A(r.x0, r.y0), A(r.x1, r.y1))];
+  const spans = d.outlines.map(span);
+  const [lo, hi] = spans[0];
+  const [tlo, thi] = spans[spans.length - 1];
   const levels = d.levels.map((L) => L.level);
   const roofZ = d.faces.front.face.roofZ;
   const ffls = [...levels.map((l) => l.elevation), roofZ];
@@ -77,7 +81,8 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
   const gridAlong = (g.axisY ? gl.ys : gl.xs).map((q) => q.v);
   for (let i = 1; i < ffls.length; i++) {
     const z = ffls[i];
-    for (const [a, b] of subtract1D(lo, hi, [hole])) R(a, z - SLAB, b, z, poche);
+    const sa = Math.min(spans[i - 1][0], (spans[i] ?? spans[i - 1])[0]), sb = Math.max(spans[i - 1][1], (spans[i] ?? spans[i - 1])[1]);
+    for (const [a, b] of subtract1D(sa, sb, [hole])) R(a, z - SLAB, b, z, poche);
     for (const ga of gridAlong) {
       if (ga > hole[0] + 0.05 && ga < hole[1] - 0.05) continue;
       R(ga - EXT_WALL / 2, z - BEAM, ga + EXT_WALL / 2, z - SLAB, poche);
@@ -103,9 +108,25 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
     }
   });
   // parapets at the cut external walls
-  for (const e of [lo, hi - EXT_WALL]) {
+  for (const e of [tlo, thi - EXT_WALL]) {
     R(e, roofZ, e + EXT_WALL, roofZ + PARAPET, poche);
     R(e - 0.03, roofZ + PARAPET, e + EXT_WALL + 0.03, roofZ + PARAPET + 0.075, { fill: shade(PAPER, 0.2), stroke: INK, sw: W.PROJ });
+  }
+  // terrace balustrades where a storey steps back from the one below
+  for (let i = 1; i < spans.length; i++) {
+    const z = ffls[i];
+    for (const [edge, inner] of [[spans[i - 1][0], spans[i][0]], [spans[i - 1][1], spans[i][1]]] as const) {
+      if (Math.abs(edge - inner) < 0.3 || (edge < inner) !== (edge === spans[i - 1][0])) continue;
+      R(edge - 0.015, z, edge + 0.015, z + 1.0, { fill: GLASS, stroke: INK, sw: W.BEYOND });
+      R(edge - 0.03, z + 0.95, edge + 0.03, z + 1.0, poche);
+    }
+  }
+  // floating roof lid on its shadow gap
+  const lid = p.massing?.lid ?? 0;
+  if (lid > 0) {
+    const zt = roofZ + PARAPET + 0.12;
+    R(tlo - lid, zt, thi + lid, zt + 0.22, poche);
+    for (const e of [tlo + 0.3, thi - 0.3]) R(e - 0.05, roofZ + PARAPET + 0.075, e + 0.05, zt, poche);
   }
   // stair head-room on the roof
   const sa = s0, sb = s0 + st.long;

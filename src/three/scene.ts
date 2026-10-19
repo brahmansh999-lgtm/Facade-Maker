@@ -6,8 +6,9 @@ import { EXT_WALL, MUMTY_HEIGHT, PARAPET, SLAB } from '../model/units.ts';
 import { subtract, type Rect } from '../geometry/rect.ts';
 import { SIDES } from '../geometry/faces.ts';
 import { GeoBuilder } from './primMeshes.ts';
+import { terraceStrips } from '../geometry/massing.ts';
 
-const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: '#9cc3cf', frame: '#3b3f42', door: '#a88866', mumty: '#ddd8cc', furn: '#d9d1c1', soft: '#c9bfae', wet: '#e9edec' };
+const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: '#9cc3cf', frame: '#3b3f42', door: '#a88866', mumty: '#ddd8cc', lid: '#f1efe9', furn: '#d9d1c1', soft: '#c9bfae', wet: '#e9edec' };
 const GLASS_OPACITY = 0.28;
 
 /** plan rect + height range → world box (X = x, Y = z, Z = −y) */
@@ -31,12 +32,22 @@ function glazing(gb: GeoBuilder, run: 'x' | 'y', c: number, a: number, b: number
   put(a + f, b - f, z0 + f, z1 - f, TONE.glass, false, GLASS_OPACITY);
 }
 
+/** glass balustrade along the open edges of a deck strip, 1.0 m above the deck */
+function balustrade(gb: GeoBuilder, r: Rect & { open: 'y0' | 'y1' }, z: number) {
+  const t = 0.03, h = 1.0;
+  const edge: [number, number, number, number] = r.open === 'y1' ? [r.x0, r.y1 - t, r.x1, r.y1] : [r.x0, r.y0, r.x1, r.y0 + t];
+  const runs: [number, number, number, number][] = [edge, [r.x0, r.y0, r.x0 + t, r.y1], [r.x1 - t, r.y0, r.x1, r.y1]];
+  for (const [x0, y0, x1, y1] of runs) {
+    pbox(gb, x0, y0, x1, y1, z, z + h - 0.05, TONE.glass, false, 0.3);
+    pbox(gb, x0 - 0.01, y0 - 0.01, x1 + 0.01, y1 + 0.01, z + h - 0.05, z + h, TONE.frame, true);
+  }
+}
+
 const FURN_TONE: Partial<Record<string, string>> = { sofa: TONE.soft, armchair: TONE.soft, bed: '#ece6da', shower: TONE.wet, wc: '#f4f4f2', basin: '#f4f4f2', rug: '#d6cdbb', plant: '#a9b49a' };
 
 export function buildHouse(d: Derived): THREE.Group {
   const gb = new GeoBuilder();
   const p = d.project;
-  const o = d.outer;
   const roofZ = d.faces.front.face.roofZ;
   // ground: the site
   const s = p.site;
@@ -44,8 +55,11 @@ export function buildHouse(d: Derived): THREE.Group {
   for (const [a, b] of [[[0, 0], [s.width, 0]], [[s.width, 0], [s.width, s.depth]], [[s.width, s.depth], [0, s.depth]], [[0, s.depth], [0, 0]]]) {
     gb.edge(new THREE.Vector3(a[0], 0, -a[1]), new THREE.Vector3(b[0], 0, -b[1]));
   }
-  // plinth
-  pbox(gb, o.x0, o.y0, o.x1, o.y1, 0, p.brief.plinth, TONE.plinth);
+  const ol = d.outlines;
+  const n = d.levels.length;
+  // plinth under the ground floor only: a cantilever hovers over open ground
+  const g0 = ol[0];
+  pbox(gb, g0.x0, g0.y0, g0.x1, g0.y1, 0, p.brief.plinth, TONE.plinth);
   // walls per level, openings cut out
   d.levels.forEach((L, i) => {
     const z0 = L.level.elevation;
@@ -73,18 +87,37 @@ export function buildHouse(d: Derived): THREE.Group {
       const h = f.kind === 'chair' ? 0.45 : f.h;
       pbox(gb, r.x0 + 0.01, r.y0 + 0.01, r.x1 - 0.01, r.y1 - 0.01, z0, z0 + Math.max(0.01, h), FURN_TONE[f.kind] ?? TONE.furn, f.kind !== 'rug');
     }
-    // slab over this level
-    pbox(gb, o.x0, o.y0, o.x1, o.y1, z1, z1 + SLAB, TONE.slab);
+    // slab over this level: covers this level and the one above (a cantilever floor, a terrace deck)
+    const a = ol[i], b = ol[i + 1] ?? ol[i];
+    pbox(gb, Math.min(a.x0, b.x0), Math.min(a.y0, b.y0), Math.max(a.x1, b.x1), Math.max(a.y1, b.y1), z1, z1 + SLAB, TONE.slab);
+    // outline edges of this storey's wall mass (walls were drawn without per-piece edges)
+    for (const [x, y] of [[a.x0, a.y0], [a.x1, a.y0], [a.x1, a.y1], [a.x0, a.y1]]) gb.edge(new THREE.Vector3(x, z0, -y), new THREE.Vector3(x, z1, -y));
   });
-  // outline edges of the wall mass (walls were drawn without per-piece edges)
-  const corners: [number, number][] = [[o.x0, o.y0], [o.x1, o.y0], [o.x1, o.y1], [o.x0, o.y1]];
-  for (const [x, y] of corners) gb.edge(new THREE.Vector3(x, p.brief.plinth, -y), new THREE.Vector3(x, roofZ, -y));
-  // parapet
+  // parapet on the top storey
   const T = EXT_WALL;
-  pbox(gb, o.x0, o.y0, o.x1, o.y0 + T, roofZ, roofZ + PARAPET, TONE.wall);
-  pbox(gb, o.x0, o.y1 - T, o.x1, o.y1, roofZ, roofZ + PARAPET, TONE.wall);
-  pbox(gb, o.x0, o.y0 + T, o.x0 + T, o.y1 - T, roofZ, roofZ + PARAPET, TONE.wall);
-  pbox(gb, o.x1 - T, o.y0 + T, o.x1, o.y1 - T, roofZ, roofZ + PARAPET, TONE.wall);
+  const top = ol[n - 1];
+  pbox(gb, top.x0, top.y0, top.x1, top.y0 + T, roofZ, roofZ + PARAPET, TONE.wall);
+  pbox(gb, top.x0, top.y1 - T, top.x1, top.y1, roofZ, roofZ + PARAPET, TONE.wall);
+  pbox(gb, top.x0, top.y0 + T, top.x0 + T, top.y1 - T, roofZ, roofZ + PARAPET, TONE.wall);
+  pbox(gb, top.x1 - T, top.y0 + T, top.x1, top.y1 - T, roofZ, roofZ + PARAPET, TONE.wall);
+  // glass balustrade round any roof terrace a stepped-back storey leaves on the one below
+  for (let i = 1; i < n; i++) {
+    const lo = ol[i - 1], up = ol[i], z = d.levels[i].level.elevation;
+    for (const r of terraceStrips(lo, up)) balustrade(gb, r, z);
+  }
+  // floating roof lid: a thin brim on a shadow gap over the parapet
+  const lid = p.massing?.lid ?? 0;
+  if (lid > 0) {
+    const zt = roofZ + PARAPET + 0.12, zb = zt + 0.22;
+    const O = { x0: top.x0 - lid, y0: top.y0 - lid, x1: top.x1 + lid, y1: top.y1 + lid };
+    const I = { x0: top.x0 + 0.6, y0: top.y0 + 0.6, x1: top.x1 - 0.6, y1: top.y1 - 0.6 };
+    pbox(gb, O.x0, O.y0, O.x1, I.y0, zt, zb, TONE.lid);
+    pbox(gb, O.x0, I.y1, O.x1, O.y1, zt, zb, TONE.lid);
+    pbox(gb, O.x0, I.y0, I.x0, I.y1, zt, zb, TONE.lid);
+    pbox(gb, I.x1, I.y0, O.x1, I.y1, zt, zb, TONE.lid);
+    // hidden posts set back in the shadow gap
+    for (const [x, y] of [[top.x0 + 0.3, top.y0 + 0.3], [top.x1 - 0.3, top.y0 + 0.3], [top.x1 - 0.3, top.y1 - 0.3], [top.x0 + 0.3, top.y1 - 0.3]]) pbox(gb, x - 0.05, y - 0.05, x + 0.05, y + 0.05, roofZ + PARAPET, zt, TONE.frame, false);
+  }
   // stair head-room
   const sp = p.stair.position;
   pbox(gb, sp.x - T / 2, sp.y - T / 2, sp.x + sp.w + T / 2, sp.y + sp.h + T / 2, roofZ, roofZ + MUMTY_HEIGHT, TONE.mumty);

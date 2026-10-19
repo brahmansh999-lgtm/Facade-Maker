@@ -87,6 +87,16 @@ export interface OpeningOverride {
   suppressed?: boolean;
 }
 
+/** push and pull of the volume, metres; 0 switches a move off */
+export interface Massing {
+  /** upper floors project forward over the ground floor (covered porch below) */
+  cantilever: number;
+  /** top floor steps back from the rear, leaving a roof terrace */
+  terrace: number;
+  /** floating roof lid overhang beyond the top floor walls */
+  lid: number;
+}
+
 export interface Project {
   version: 1;
   name: string;
@@ -97,6 +107,7 @@ export interface Project {
   stair: StairSpec;
   facade: FacadeState;
   openingOverrides: Record<string, OpeningOverride>;
+  massing: Massing;
   /** Programme items the layout solver could not place. */
   unplaced: string[];
 }
