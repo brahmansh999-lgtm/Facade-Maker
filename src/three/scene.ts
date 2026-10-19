@@ -8,6 +8,7 @@ import { SIDES } from '../geometry/faces.ts';
 import { GeoBuilder } from './primMeshes.ts';
 import { Region, loopEdges, shapes } from '../geometry/region.ts';
 import type { Vec2 } from '../model/types.ts';
+import { rng } from '../model/units.ts';
 
 const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: '#9cc3cf', frame: '#3b3f42', door: '#a88866', mumty: '#ddd8cc', column: '#d4cfc4', lawn: '#c9d4b0', pave: '#dedad0', bed: '#aab68f', bwall: '#e2dccf', leaf: '#8fa474', trunk: '#7a6a58', deck: '#d9c9a8', canopy: '#ece9e1', lid: '#f1efe9', furn: '#d9d1c1', soft: '#c9bfae', wet: '#e9edec' };
 const GLASS_OPACITY = 0.28;
@@ -71,6 +72,56 @@ function balustrades(gb: GeoBuilder, deck: Region, upper: Region, z: number) {
   }
 }
 
+/** a tapered limb (hexagonal frustum) from a to b */
+function limb(gb: GeoBuilder, a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, hex: string) {
+  const ax = new THREE.Vector3().subVectors(b, a).normalize();
+  const u = new THREE.Vector3().crossVectors(ax, Math.abs(ax.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize();
+  const v = new THREE.Vector3().crossVectors(ax, u);
+  const ring = (c: THREE.Vector3, r: number) => Array.from({ length: 6 }, (_, k) => {
+    const q = (k / 6) * Math.PI * 2;
+    return c.clone().addScaledVector(u, Math.cos(q) * r).addScaledVector(v, Math.sin(q) * r);
+  });
+  const A = ring(a, r0), B = ring(b, r1);
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  for (let k = 0; k < 6; k++) gb.quad(A[k], A[(k + 1) % 6], B[(k + 1) % 6], B[k], hex, 1, mid);
+}
+
+/** an irregular leaf mass: a jittered icosphere, shaded facet by facet */
+function blob(gb: GeoBuilder, c: THREE.Vector3, r: number, hex: string, rnd: () => number) {
+  const pos = new THREE.IcosahedronGeometry(1, 1).getAttribute('position');
+  const bump = new Map<string, number>();
+  const at = (i: number) => {
+    const p = new THREE.Vector3().fromBufferAttribute(pos, i);
+    const k = `${p.x.toFixed(3)},${p.y.toFixed(3)},${p.z.toFixed(3)}`;
+    if (!bump.has(k)) bump.set(k, 0.82 + rnd() * 0.3);
+    // a little flatter underneath, as canopies are
+    return c.clone().add(new THREE.Vector3(p.x * r, p.y * r * (p.y < 0 ? 0.62 : 0.9), p.z * r).multiplyScalar(bump.get(k)!));
+  };
+  for (let i = 0; i < pos.count; i += 3) gb.tri(at(i), at(i + 1), at(i + 2), hex, 1, c);
+}
+
+/** a tree: tapered trunk forking into three branches, a crown of clustered leaf masses */
+function tree(gb: GeoBuilder, x: number, y: number, r: number, seed: number) {
+  const rnd = rng(seed);
+  const P = (px: number, pz: number, py: number) => new THREE.Vector3(px, pz, -py);
+  const greens = ['#5f7d48', '#6f8f55', '#557141', '#7a9a5e'];
+  const H = 1.5 + r * 0.45;
+  const base = P(x, 0, y), fork = P(x + (rnd() - 0.5) * 0.15, H, y + (rnd() - 0.5) * 0.15);
+  limb(gb, base, fork, 0.13 + r * 0.03, 0.09, '#6f5f4e');
+  const ends: THREE.Vector3[] = [];
+  const turn = rnd() * Math.PI * 2;
+  for (let k = 0; k < 3; k++) {
+    const q = turn + (k / 3) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+    const e = fork.clone().add(new THREE.Vector3(Math.cos(q) * r * 0.5, r * (0.55 + rnd() * 0.25), Math.sin(q) * r * 0.5));
+    limb(gb, fork, e, 0.07, 0.035, '#6f5f4e');
+    ends.push(e);
+  }
+  // crown: one mass over the fork, one on each branch, a smaller one on top
+  blob(gb, fork.clone().add(new THREE.Vector3(0, r * 0.75, 0)), r * 0.78, greens[0], rnd);
+  ends.forEach((e, k) => blob(gb, e.clone().add(new THREE.Vector3(0, r * 0.12, 0)), r * (0.5 + rnd() * 0.12), greens[(k + 1) % greens.length], rnd));
+  blob(gb, fork.clone().add(new THREE.Vector3((rnd() - 0.5) * 0.3 * r, r * 1.35, (rnd() - 0.5) * 0.3 * r)), r * 0.5, greens[3], rnd);
+}
+
 /** garden, paving, planting, boundary wall and gates, trees, and the rear verandah */
 function siteWorks3D(gb: GeoBuilder, d: Derived) {
   const w = d.works;
@@ -86,15 +137,7 @@ function siteWorks3D(gb: GeoBuilder, d: Derived) {
     pbox(gb, r.x0 - 0.03, r.y0 - 0.03, r.x1 + 0.03, r.y1 + 0.03, h, h + 0.06, TONE.slab);
   }
   for (const g of w.gates) pbox(gb, g.x0, g.y0 + 0.08, g.x1, g.y1 - 0.08, 0.05, g.kind === 'car' ? 1.5 : 1.4, TONE.frame, true, 0.55);
-  for (const t of w.trees) {
-    pbox(gb, t.x - 0.1, t.y - 0.1, t.x + 0.1, t.y + 0.1, 0, 1.9, TONE.trunk, false);
-    const tier = (r: number, z0: number, h: number) => {
-      const prof = Array.from({ length: 8 }, (_, k) => V([t.x + Math.cos((k / 8) * Math.PI * 2) * r, t.y - Math.sin((k / 8) * Math.PI * 2) * r], z0));
-      gb.extrude(prof, new THREE.Vector3(0, h, 0), TONE.leaf);
-    };
-    tier(t.r, 1.8, 1.3);
-    tier(t.r * 0.68, 3.1, 0.9);
-  }
+  w.trees.forEach((t, i) => tree(gb, t.x, t.y, t.r, 97 + i * 31));
   const vr = w.verandah;
   if (vr) {
     const top = d.project.brief.plinth - 0.03;

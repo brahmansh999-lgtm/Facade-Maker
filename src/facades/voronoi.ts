@@ -150,8 +150,8 @@ export const voronoi: FacadeType = {
     def({ key: 'voids', label: 'Open cells', unit: '%', min: 0, max: 40, step: 1, default: 0 }),
   ],
   palettes: [
-    { name: 'White solid surface', primary: '#f2f1ec', secondary: '#e2e1dc', accent: '#2a2d30' },
     { name: 'Champagne aluminium', primary: '#d8ccb6', secondary: '#c7b99f', accent: '#3b362f' },
+    { name: 'White solid surface', primary: '#f2f1ec', secondary: '#e2e1dc', accent: '#2a2d30' },
     { name: 'Graphite', primary: '#62676c', secondary: '#565b60', accent: '#d4d6d8' },
   ],
   generate(face, openings, levels, orient, params, palette) {
