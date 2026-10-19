@@ -9,7 +9,7 @@ export const fluted: FacadeType = {
   name: 'Fluted white GRC, wave',
   description: 'Storey-high GRC panels hung from the slab edge with flutes whose depth swells and fades as a wave along the facade. Horizontal joints at slab bands, vertical joints on a module inside each bay; flutes return cleanly at every opening.',
   params: [
-    def({ key: 'flute', label: 'Flute width', unit: 'mm', min: 50, max: 300, step: 10, default: 120 }),
+    def({ key: 'flute', label: 'Flute width', unit: 'mm', min: 50, max: 300, step: 10, default: 180 }),
     def({ key: 'fdepth', label: 'Flute depth', unit: 'mm', min: 10, max: 80, step: 5, default: 35 }),
     def({ key: 'profile', label: 'Flute profile', unit: '', kind: 'select', default: 'round', options: [
       { value: 'round', label: 'Round' }, { value: 'vee', label: 'Vee' }, { value: 'square', label: 'Square' }] }),

@@ -10,7 +10,7 @@ export const folded: FacadeType = {
   name: 'Folded metal cladding',
   description: 'Pleated aluminium or zinc cassettes on a rail system, storey- or half-storey high, folds vertical or horizontal. Openings are trimmed with pressed head and sill flashings so the pleats return cleanly.',
   params: [
-    def({ key: 'fold', label: 'Fold width', unit: 'mm', min: 100, max: 600, step: 10, default: 300 }),
+    def({ key: 'fold', label: 'Fold width', unit: 'mm', min: 100, max: 600, step: 10, default: 450 }),
     def({ key: 'angle', label: 'Fold angle', unit: '°', min: 15, max: 60, step: 1, default: 35 }),
     def({ key: 'dir', label: 'Fold direction', unit: '', kind: 'select', default: 'vertical', options: [
       { value: 'vertical', label: 'Vertical pleats' }, { value: 'horizontal', label: 'Horizontal pleats' }] }),

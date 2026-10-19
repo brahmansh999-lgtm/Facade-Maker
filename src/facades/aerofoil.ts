@@ -6,11 +6,11 @@ const POST = 0.07;
 
 export const aerofoil: FacadeType = {
   id: 'aerofoil',
-  num: 3,
+  num: 5,
   name: 'Aerofoil aluminium louvres',
   description: 'Extruded aluminium aerofoil blades spanning between slim mullions on the grid. Blade chord follows the sun cut-off: depth = pitch / tan(cut-off). With climate response on, the cut-off is this face’s vertical shadow angle at peak exposure.',
   params: [
-    def({ key: 'pitch', label: 'Blade pitch', unit: 'mm', min: 150, max: 600, step: 10, default: 300 }),
+    def({ key: 'pitch', label: 'Blade pitch', unit: 'mm', min: 150, max: 600, step: 10, default: 420 }),
     def({ key: 'depth', label: 'Blade depth', unit: 'mm', min: 100, max: 600, step: 10, default: 250 }),
     def({ key: 'auto', label: 'Depth from cut-off', unit: '', kind: 'toggle', default: true }),
     def({ key: 'cutoff', label: 'Sun cut-off angle', unit: '°', min: 20, max: 75, step: 1, default: 45 }),

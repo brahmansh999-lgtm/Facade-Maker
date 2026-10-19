@@ -8,11 +8,11 @@ const T = 0.024;
 
 export const dichroic: FacadeType = {
   id: 'dichroic',
-  num: 9,
+  num: 10,
   name: 'Dichroic glass fins',
   description: 'Laminated dichroic glass blades in stainless shoes at every slab band. Colour shifts across the face and with viewing angle; the blades twist from end to end. Fins straighten or drop out in front of windows to keep the free area.',
   params: [
-    def({ key: 'spacing', label: 'Spacing', unit: 'mm', min: 300, max: 1200, step: 25, default: 600 }),
+    def({ key: 'spacing', label: 'Spacing', unit: 'mm', min: 300, max: 1200, step: 25, default: 900 }),
     def({ key: 'depth', label: 'Blade depth', unit: 'mm', min: 200, max: 700, step: 10, default: 420 }),
     def({ key: 'rot0', label: 'Twist at left', unit: '°', min: -60, max: 60, step: 1, default: -25 }),
     def({ key: 'rot1', label: 'Twist at right', unit: '°', min: -60, max: 60, step: 1, default: 35 }),

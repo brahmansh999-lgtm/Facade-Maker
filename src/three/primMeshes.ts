@@ -2,7 +2,7 @@
 // flat tones baked per facet from its world normal, plus explicit edge line segments.
 import * as THREE from 'three';
 import type { Face, Prim } from '../facades/types.ts';
-import { barQuad, boxAsPrism, ccw } from '../drawings/primDraw.ts';
+import { barQuad, boxAsPrism, ccw, sweepRails } from '../drawings/primDraw.ts';
 import { hexToRgb, INK } from '../drawings/color.ts';
 
 const LIGHT = new THREE.Vector3(-0.55, 0.85, 0.62).normalize();
@@ -150,13 +150,34 @@ export function addPrims(gb: GeoBuilder, prims: Prim[], face: Face) {
         const nW = Wp(0, 0, 1).sub(Wp(0, 0, 0));
         const ref = c.clone().sub(nW);
         for (let i = 1; i < pts.length - 1; i++) gb.tri(pts[0], pts[i], pts[i + 1], p.fill, p.opacity ?? 1, ref);
-        for (let i = 0; i < pts.length; i++) gb.edge(pts[i], pts[(i + 1) % pts.length]);
+        if (!p.soft) for (let i = 0; i < pts.length; i++) gb.edge(pts[i], pts[(i + 1) % pts.length]);
         break;
       }
       case 'bar': {
         const q = barQuad(p).map(([u, z]) => Wp(u, z, p.d0));
         const dir = Wp(0, 0, p.d1 - p.d0).sub(Wp(0, 0, 0));
         gb.extrude(q, dir, p.fill, p.opacity ?? 1);
+        break;
+      }
+      case 'sweep': {
+        // one smooth member: side and front faces per segment, edges only along the rails and at the ends
+        const { L, R } = sweepRails(p);
+        const n = p.pts.length, op = p.opacity ?? 1;
+        const Lb = L.map(([u, z]) => Wp(u, z, p.d0)), Rb = R.map(([u, z]) => Wp(u, z, p.d0));
+        const Lf = L.map(([u, z], i) => Wp(u, z, p.pts[i][2])), Rf = R.map(([u, z], i) => Wp(u, z, p.pts[i][2]));
+        for (let i = 0; i < n - 1; i++) {
+          const ref = Lb[i].clone().add(Rb[i + 1]).add(Lf[i + 1]).add(Rf[i]).multiplyScalar(0.25);
+          gb.quad(Lf[i], Lf[i + 1], Rf[i + 1], Rf[i], p.fill, op, ref);
+          gb.quad(Lb[i], Lb[i + 1], Lf[i + 1], Lf[i], p.fill, op, ref);
+          gb.quad(Rb[i], Rb[i + 1], Rf[i + 1], Rf[i], p.fill, op, ref);
+          gb.edge(Lf[i], Lf[i + 1]); gb.edge(Rf[i], Rf[i + 1]);
+          gb.edge(Lb[i], Lb[i + 1]); gb.edge(Rb[i], Rb[i + 1]);
+        }
+        for (const i of [0, n - 1]) {
+          const ref = Lb[i].clone().add(Rf[i]).multiplyScalar(0.5).add(Wp(0, i ? -1 : 1, 0).sub(Wp(0, 0, 0)));
+          gb.quad(Lb[i], Rb[i], Rf[i], Lf[i], p.fill, op, ref);
+          gb.edge(Lf[i], Rf[i]); gb.edge(Lb[i], Lf[i]); gb.edge(Rb[i], Rf[i]);
+        }
         break;
       }
       case 'line': {

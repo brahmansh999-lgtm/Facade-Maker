@@ -12,7 +12,7 @@ export const ribbed: FacadeType = {
   params: [
     def({ key: 'uh', label: 'Unit height', unit: 'mm', min: 300, max: 1200, step: 25, default: 750 }),
     def({ key: 'uw', label: 'Unit length', unit: 'mm', min: 600, max: 2400, step: 50, default: 1500 }),
-    def({ key: 'pitch', label: 'Rib pitch', unit: 'mm', min: 50, max: 200, step: 5, default: 100 }),
+    def({ key: 'pitch', label: 'Rib pitch', unit: 'mm', min: 50, max: 200, step: 5, default: 150 }),
     def({ key: 'd0', label: 'Rib depth at base', unit: 'mm', min: 10, max: 100, step: 5, default: 20 }),
     def({ key: 'd1', label: 'Rib depth at top', unit: 'mm', min: 10, max: 150, step: 5, default: 80 }),
     def({ key: 'joint', label: 'Joint', unit: 'mm', min: 5, max: 20, step: 1, default: 10 }),

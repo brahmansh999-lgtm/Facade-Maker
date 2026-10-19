@@ -6,12 +6,12 @@ const SEG = 0.3;
 
 export const ribbons: FacadeType = {
   id: 'ribbons',
-  num: 10,
+  num: 3,
   name: 'Wave ribbons',
   description: 'Horizontal aluminium ribbons on CNC-cut fins, each one rippling in and out from the wall as a travelling wave. Ribbon pitch opens up in front of windows; ribbons stop short of doors.',
   params: [
-    def({ key: 'height', label: 'Ribbon height', unit: 'mm', min: 60, max: 300, step: 5, default: 120 }),
-    def({ key: 'pitch', label: 'Pitch', unit: 'mm', min: 200, max: 800, step: 10, default: 360 }),
+    def({ key: 'height', label: 'Ribbon height', unit: 'mm', min: 60, max: 300, step: 5, default: 140 }),
+    def({ key: 'pitch', label: 'Pitch', unit: 'mm', min: 200, max: 800, step: 10, default: 600 }),
     def({ key: 'amp', label: 'Wave amplitude', unit: 'mm', min: 0, max: 700, step: 10, default: 320 }),
     def({ key: 'length', label: 'Wavelength', unit: 'mm', min: 1500, max: 9000, step: 100, default: 4200 }),
     def({ key: 'phase', label: 'Phase per ribbon', unit: '°', min: 0, max: 60, step: 1, default: 14 }),

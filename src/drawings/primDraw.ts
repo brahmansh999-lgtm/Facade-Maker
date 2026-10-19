@@ -47,7 +47,33 @@ export function primBox(p: Prim): { u0: number; u1: number; z0: number; z1: numb
       return { u0: Math.min(...us), u1: Math.max(...us), z0: Math.min(...zs), z1: Math.max(...zs), d0: p.d0, d1: p.d1 };
     }
     case 'perf': case 'mesh': return { u0: p.u, u1: p.u + p.w, z0: p.z, z1: p.z + p.h, d0: p.d0, d1: p.d1 };
+    case 'sweep': {
+      const us = p.pts.map((q) => q[0]), zs = p.pts.map((q) => q[1]), m = p.w / 2;
+      return { u0: Math.min(...us) - m, u1: Math.max(...us) + m, z0: Math.min(...zs) - m, z1: Math.max(...zs) + m, d0: p.d0, d1: Math.max(...p.pts.map((q) => q[2])) };
+    }
   }
+}
+
+/** left and right rails of a sweep in the elevation plane (mitred at the vertices) */
+export function sweepRails(p: Extract<Prim, { kind: 'sweep' }>): { L: [number, number][]; R: [number, number][] } {
+  const n = p.pts.length, L: [number, number][] = [], R: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = p.pts[Math.max(0, i - 1)], b = p.pts[Math.min(n - 1, i + 1)];
+    const tu = b[0] - a[0], tz = b[1] - a[1], l = Math.hypot(tu, tz) || 1;
+    const nu = (-tz / l) * (p.w / 2), nz = (tu / l) * (p.w / 2);
+    const [u, z] = p.pts[i];
+    L.push([u + nu, z + nz]); R.push([u - nu, z - nz]);
+  }
+  return { L, R };
+}
+
+/** does any segment of a sweep come within its half-width of rect (u,z)? */
+export function sweepHitsRect(p: Extract<Prim, { kind: 'sweep' }>, r: { x0: number; x1: number; y0: number; y1: number }): boolean {
+  for (let i = 0; i < p.pts.length - 1; i++) {
+    const bar = { kind: 'bar', role: p.role, fill: p.fill, a: [p.pts[i][0], p.pts[i][1]], b: [p.pts[i + 1][0], p.pts[i + 1][1]], w: p.w, d0: 0, d1: 0 } as Extract<Prim, { kind: 'bar' }>;
+    if (barHitsRect(bar, r)) return true;
+  }
+  return false;
 }
 
 /** the bar's outline in the elevation plane (u,z), CCW */
@@ -119,12 +145,18 @@ export function drawPrims(pt: Painter, prims: Prim[], m: ElevMap, opts: { line?:
       case 'facet': {
         const [nu, nz, nd] = facetNormal(p.pts);
         const pts = p.pts.flatMap(([u, z]) => [m.X(u), m.Y(z)]);
-        pt.poly(pts, true, { fill: facetTone(p.fill, nu, nz, nd), stroke: INK, sw: fine, opacity: p.opacity });
+        pt.poly(pts, true, p.soft ? { fill: facetTone(p.fill, nu, nz, nd), stroke: facetTone(p.fill, nu, nz, nd), sw: 0.05, opacity: p.opacity } : { fill: facetTone(p.fill, nu, nz, nd), stroke: INK, sw: fine, opacity: p.opacity });
         break;
       }
       case 'bar': {
         const pts = barQuad(p).flatMap(([u, z]) => [m.X(u), m.Y(z)]);
         pt.poly(pts, true, { fill: p.fill, stroke: INK, sw, opacity: p.opacity });
+        break;
+      }
+      case 'sweep': {
+        const { L, R } = sweepRails(p);
+        const pts = [...L, ...R.reverse()].flatMap(([u, z]) => [m.X(u), m.Y(z)]);
+        pt.poly(pts, true, { fill: p.fill, stroke: INK, sw: fine, opacity: p.opacity });
         break;
       }
       case 'disc':

@@ -10,7 +10,7 @@ export const garden: FacadeType = {
   name: 'Vertical garden net',
   description: 'White GRC planter ledges cantilever off every slab band, strung with a stainless cable net on the grid rhythm. Climbers grow up (or trail down) the net and are trained away from windows and doors.',
   params: [
-    def({ key: 'cable', label: 'Cable spacing', unit: 'mm', min: 300, max: 1200, step: 25, default: 600 }),
+    def({ key: 'cable', label: 'Cable spacing', unit: 'mm', min: 300, max: 1200, step: 25, default: 900 }),
     def({ key: 'pdepth', label: 'Planter depth', unit: 'mm', min: 300, max: 900, step: 25, default: 500 }),
     def({ key: 'pheight', label: 'Planter height', unit: 'mm', min: 300, max: 600, step: 25, default: 450 }),
     def({ key: 'cover', label: 'Foliage cover', unit: '%', min: 10, max: 90, step: 1, default: 55 }),

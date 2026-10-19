@@ -19,7 +19,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 
 ### 3. Elevations
 - All four elevations, fully dimensioned, with floor levels and the structural grid.
-- 15 modern facade systems: kinetic pixel skin, twisting aluminium fins, aerofoil louvres, diagrid exoskeleton, parametric perforated skin, double skin with mesh, faceted hex tiles, kinetic triangular panels, dichroic glass fins, wave ribbons, folded metal, fluted white GRC, UHPC brise-soleil grid, ribbed UHPC and a vertical garden net.
+- 15 modern facade systems, led by a cushioned Voronoi shell (every window sits in its own organic cell) and fluid flow lines (full-height fins that part around openings like water), then wave ribbons, twisting aluminium fins, aerofoil louvres, diagrid exoskeleton, parametric perforated skin, double skin with mesh, faceted hex tiles, dichroic glass fins, folded metal, fluted white GRC, UHPC brise-soleil grid, ribbed UHPC and a vertical garden net.
 - Each facade has 4–7 adjustable settings in real units, 3 material palettes, and can be set differently for each elevation.
 - Facades respond to the sun: denser and deeper on the hot faces, lighter on the north, using the site's latitude.
 - Facades never block a door, and any screen in front of a window lets through enough air for the room behind it.

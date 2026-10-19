@@ -21,7 +21,7 @@ export const DEFAULT_BRIEF: Brief = {
   plinth: 0.45,
 };
 
-export function defaultFacade(active = 'pixels'): FacadeState {
+export function defaultFacade(active = 'voronoi'): FacadeState {
   const t = getFacade(active);
   const pe = (): ElevationSetting => ({ override: false, typeId: t.id, params: defaultParams(t), palette: 0 });
   return {

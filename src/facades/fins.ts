@@ -5,11 +5,11 @@ import { lerp } from '../model/units.ts';
 
 export const fins: FacadeType = {
   id: 'fins',
-  num: 2,
+  num: 4,
   name: 'Twisting aluminium fins',
   description: 'Extruded aluminium blade fins on rails at every slab band. Fins land on each grid line and subdivide the bays; their angle twists across the face, leaning toward the low sun on exposed elevations. In front of glazing a fin straightens or drops out to keep the free area.',
   params: [
-    def({ key: 'spacing', label: 'Spacing', unit: 'mm', min: 150, max: 900, step: 25, default: 400 }),
+    def({ key: 'spacing', label: 'Spacing', unit: 'mm', min: 150, max: 900, step: 25, default: 600 }),
     def({ key: 'depth', label: 'Fin depth', unit: 'mm', min: 150, max: 600, step: 25, default: 300 }),
     def({ key: 'thick', label: 'Fin thickness', unit: 'mm', min: 30, max: 100, step: 5, default: 50 }),
     def({ key: 'rot0', label: 'Angle at left', unit: '°', min: -60, max: 60, step: 1, default: 0 }),

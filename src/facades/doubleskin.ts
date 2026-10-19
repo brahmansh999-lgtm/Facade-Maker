@@ -4,7 +4,7 @@ import { GLASS_DARK, mix } from '../drawings/color.ts';
 
 export const doubleskin: FacadeType = {
   id: 'doubleskin',
-  num: 6,
+  num: 8,
   name: 'Double skin: glass + mesh',
   description: 'Inner skin of spandrel glass rainscreen between the windows; outer skin of tensioned stainless mesh on cantilever brackets at every slab, with a maintenance catwalk in the cavity. Mesh open area never drops below what the windows behind need.',
   params: [

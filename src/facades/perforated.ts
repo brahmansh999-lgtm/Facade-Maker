@@ -6,11 +6,11 @@ const TILE = 0.6;
 
 export const perforated: FacadeType = {
   id: 'perforated',
-  num: 5,
+  num: 7,
   name: 'Parametric perforated skin',
   description: '3 mm aluminium panels CNC-punched from a density field, hung on a rail sub-frame off the slab bands. Holes swell in front of windows until each tile passes the room’s required free area; doors stay clear.',
   params: [
-    def({ key: 'pitch', label: 'Hole pitch', unit: 'mm', min: 40, max: 150, step: 5, default: 80 }),
+    def({ key: 'pitch', label: 'Hole pitch', unit: 'mm', min: 40, max: 150, step: 5, default: 110 }),
     def({ key: 'dmin', label: 'Min. hole', unit: 'mm', min: 5, max: 40, step: 1, default: 12 }),
     def({ key: 'dmax', label: 'Max. hole', unit: 'mm', min: 20, max: 80, step: 1, default: 48 }),
     def({ key: 'map', label: 'Density map', unit: '', kind: 'select', default: 'openings', options: [
