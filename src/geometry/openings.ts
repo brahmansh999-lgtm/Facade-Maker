@@ -115,6 +115,13 @@ export function deriveOpenings(
         .filter((x) => x.len - 0.9 >= 0.6)
         .sort((a, b) => b.f * Math.min(b.len, 4) - a.f * Math.min(a.len, 4));
       const shares = ranked.length >= 2 && A >= 12 ? [0.65, 0.35] : [1];
+      // a cantilevered lounge bay is all view: picture glass across its end wall
+      if (room.id.endsWith('-bay') && ranked.length) {
+        const end = ext.find((w) => w.outside === 'front') ?? ranked[0].w;
+        out.push(base(`${room.id}:win:${end.outside}`, end, room, null, 'window', (end.s0 + end.s1) / 2, r3(wallLength(end) - 0.6), 0.3, 2.4));
+        ranked.splice(0, ranked.length, ...ranked.filter((x) => x.w !== end).slice(0, 1));
+        shares.splice(0, shares.length, ...(ranked.length ? [0.4] : []));
+      }
       let carry = 0;
       ranked.slice(0, shares.length).forEach((x, k) => {
         const want = Math.max(target * shares[k] * x.f, req * 1.3 * shares[k]) + carry;

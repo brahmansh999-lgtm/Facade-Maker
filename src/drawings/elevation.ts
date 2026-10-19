@@ -3,7 +3,8 @@
 import type { Derived } from '../model/derive.ts';
 import type { Side } from '../model/types.ts';
 import type { Face } from '../geometry/faces.ts';
-import { FACE_NAME } from '../geometry/faces.ts';
+import { FACE_NAME, toD, toU } from '../geometry/faces.ts';
+import { Region } from '../geometry/region.ts';
 import type { Prim } from '../facades/types.ts';
 import { levelText } from '../model/units.ts';
 import { BAND } from '../facades/kit.ts';
@@ -55,9 +56,9 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
     R(m.u0 - 0.05, m.z1 - 0.15, m.u1 + 0.05, m.z1, { fill: shade(WALL_TONE, 0.1), stroke: INK, sw: W.BEYOND });
   }
   // wall per massing zone (set-back zones a touch darker), plinth, slab bands, parapet coping
-  const zones = f.zones.length ? f.zones : [{ u0: 0, u1: f.width, z0: f.plinthTop, z1: f.parapetTop, inset: 0, levels: f.levels.map((l) => l.index), roof: true }];
-  const z0w = zones[0];
-  for (const z of zones) {
+  const zones = f.zones.length ? f.zones : [{ u0: 0, u1: f.width, z0: f.plinthTop, z1: f.parapetTop, inset: 0, levels: f.levels.map((l) => l.index), roof: true, overhang: 0, deck: false }];
+  // far planes first so nearer walls overlap them
+  for (const z of [...zones].sort((a, b) => b.inset - a.inset)) {
     R(z.u0, z.z0, z.u1, z.z1, { fill: z.inset > 1e-3 ? shade(WALL_TONE, -0.05) : WALL_TONE });
     for (const li of z.levels) {
       const l = f.levels.find((q) => q.index === li);
@@ -74,7 +75,7 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
       pt.line(X(z.u0), Y(z.z1), X(z.u1), Y(z.z1), { stroke: INK, sw: W.PROJ });
     }
   }
-  R(z0w.u0, 0, z0w.u1, f.plinthTop, { fill: shade(WALL_TONE, 0.16), stroke: INK, sw: W.PROJ });
+  for (const z of zones) if (z.levels.includes(0)) R(z.u0, 0, z.u1, f.plinthTop, { fill: shade(WALL_TONE, 0.16), stroke: INK, sw: W.PROJ });
 
   // openings
   for (const op of f.openings) {
@@ -106,37 +107,40 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
   drawPrims(pt, prims, { X, Y, k }, { line: o.simple ? 0.1 : W.BEYOND, detail: o.simple ? 0 : 1 });
   pt.end();
 
-  // massing: shadow under each cantilever, glass to terraces, the floating roof lid
-  for (let k = 1; k < zones.length; k++) {
-    const lo = zones[k - 1], up = zones[k];
-    if (up.inset < lo.inset - 1e-3 || up.u0 < lo.u0 - 1e-3 || up.u1 > lo.u1 + 1e-3) {
-      const depth = Math.max(0.2, Math.min(0.7, (lo.inset - up.inset) * 0.45 || 0.35));
-      R(Math.max(lo.u0, up.u0), up.z0 - depth, Math.min(lo.u1, up.u1), up.z0, { fill: INK, opacity: 0.13 });
-      pt.line(X(up.u0), Y(up.z0), X(up.u1), Y(up.z0), { stroke: INK, sw: W.PROJ });
-    } else {
-      const zt = lo.z1, runs: [number, number][] = up.inset > lo.inset + 1e-3 ? [[lo.u0, lo.u1]] : [[lo.u0, up.u0], [up.u1, lo.u1]];
-      for (const [a, b] of runs) {
-        if (b - a < 0.05) continue;
-        R(a, zt, b, zt + 1.0, { fill: GLASS, opacity: 0.55, stroke: INK, sw: W.BEYOND });
-        R(a, zt + 0.95, b, zt + 1.0, { fill: shade(INK, -0.2), stroke: INK, sw: W.THIN });
-      }
+  // massing: shadow under each cantilever, glass to terraces, columns, the floating roof lid
+  for (const z of zones) {
+    if (z.overhang > 0) {
+      const depth = Math.max(0.2, Math.min(0.7, z.overhang * 0.45));
+      R(z.u0, z.z0 - depth, z.u1, z.z0, { fill: INK, opacity: 0.13 });
+      pt.line(X(z.u0), Y(z.z0), X(z.u1), Y(z.z0), { stroke: INK, sw: W.PROJ });
+    }
+    if (z.deck) {
+      R(z.u0, z.z1, z.u1, z.z1 + 1.0, { fill: GLASS, opacity: 0.55, stroke: INK, sw: W.BEYOND });
+      R(z.u0, z.z1 + 0.95, z.u1, z.z1 + 1.0, { fill: shade(INK, -0.2), stroke: INK, sw: W.THIN });
     }
   }
+  for (const c of d.columns) {
+    const u = toU(f, c.x, c.y), back = -toD(f, c.x, c.y) - c.s / 2;
+    if (zones.some((z) => z.levels.includes(0) && u > z.u0 && u < z.u1 && z.inset < back)) continue;
+    R(u - c.s / 2, 0, u + c.s / 2, c.z1, { fill: shade(WALL_TONE, 0.08), stroke: INK, sw: W.PROJ });
+    R(u + c.s / 2 - 0.06, 0, u + c.s / 2, c.z1, { fill: INK, opacity: 0.12 });
+  }
   const lid = d.project.massing?.lid ?? 0;
-  const zr = zones[zones.length - 1];
-  if (lid > 0) {
+  const roofs = zones.filter((z) => z.roof);
+  if (lid > 0 && roofs.length) {
+    const ua = Math.min(...roofs.map((z) => z.u0)), ub = Math.max(...roofs.map((z) => z.u1));
     const zt = f.parapetTop + 0.12;
-    for (const u of [zr.u0 + 0.3, zr.u1 - 0.3]) R(u - 0.05, f.parapetTop, u + 0.05, zt, { fill: shade(INK, -0.3) });
-    R(zr.u0 - lid, zt, zr.u1 + lid, zt + 0.22, { fill: '#f1efe9', stroke: INK, sw: lineW });
-    R(zr.u0 - lid, zt, zr.u1 + lid, zt + 0.04, { fill: INK, opacity: 0.18 });
+    for (const u of [ua + 0.3, ub - 0.3]) R(u - 0.05, f.parapetTop, u + 0.05, zt, { fill: shade(INK, -0.3) });
+    R(ua - lid, zt, ub + lid, zt + 0.22, { fill: '#f1efe9', stroke: INK, sw: lineW });
+    R(ua - lid, zt, ub + lid, zt + 0.04, { fill: INK, opacity: 0.18 });
   }
 
-  // silhouette, stepping with the massing
-  const sil: number[] = [];
-  sil.push(X(z0w.u0), Y(0));
-  zones.forEach((z, k) => { sil.push(X(z.u0), Y(k ? z.z0 : 0), X(z.u0), Y(z.z1)); });
-  [...zones].reverse().forEach((z, k) => { sil.push(X(z.u1), Y(z.z1), X(z.u1), Y(k === zones.length - 1 ? 0 : z.z0)); });
-  pt.poly(sil, true, { stroke: INK, sw: lineW });
+  // silhouette of the whole mass on this face
+  const sil = Region.of([
+    ...zones.map((z) => ({ x0: z.u0, y0: z.z0, x1: z.u1, y1: z.z1 })),
+    ...zones.filter((z) => z.levels.includes(0)).map((z) => ({ x0: z.u0, y0: 0, x1: z.u1, y1: f.plinthTop })),
+  ]);
+  for (const lp of sil.loops()) pt.poly(lp.flatMap(([u, z]) => [X(u), Y(z)]), true, { stroke: INK, sw: lineW });
 
   // opening tags + flags
   if (o.tags) for (const op of f.openings) pt.text(X((op.u0 + op.u1) / 2), Y(op.z0) + 3.2, op.tag, { size: 1.4, font: 'mono', anchor: 'middle', fill: shade(INK, -0.3) });

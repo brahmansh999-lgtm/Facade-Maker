@@ -1,6 +1,7 @@
 import type { FaceKey, Project, Side, Vec2 } from '../model/types.ts';
 import { EXT_WALL, PARAPET, SLAB } from '../model/units.ts';
 import { roomRect, union, type Rect } from './rect.ts';
+import { Region, loopEdges } from './region.ts';
 
 export const SIDES: Side[] = ['front', 'right', 'rear', 'left'];
 
@@ -49,6 +50,10 @@ export interface FaceZone {
   inset: number;
   levels: number[];
   roof: boolean;
+  /** how far this zone projects past the storey below (a cantilever soffit), m; 0 if it does not */
+  overhang: number;
+  /** the top edge is open: the roof of this zone is a terrace deck */
+  deck: boolean;
 }
 
 export interface Face {
@@ -131,28 +136,74 @@ export function buildFaceShell(p: Project, side: Side): Omit<Face, 'openings'> {
   };
 }
 
-/** per-level wall plane and extent on this face, grouped into zones bottom → top */
+const OUT: Record<Side, Vec2> = NORMAL;
+
+/**
+ * Wall planes of every storey on this face, from the storeys' true outlines. Each outline edge
+ * facing this side is one plane; edges are split at every break any storey makes along the face,
+ * pieces repeating storey after storey are stacked into one zone, and neighbours with identical
+ * build-up are merged back.
+ */
 function faceZones(p: Project, side: Side, fr: { O: Vec2; U: Vec2; N: Vec2 }, o: Rect): FaceZone[] {
   const rz = roofZ(p);
-  const per = p.levels.map((l) => {
-    const r = outerRect(union(l.rooms.map(roomRect)));
-    const us = [toU(fr, r.x0, r.y0), toU(fr, r.x1, r.y1)];
-    const inset = side === 'front' ? r.y0 - o.y0 : side === 'rear' ? o.y1 - r.y1 : side === 'left' ? r.x0 - o.x0 : o.x1 - r.x1;
-    return { u0: Math.min(...us), u1: Math.max(...us), inset: Math.max(0, inset) };
-  });
-  const same = (a: (typeof per)[number], b: (typeof per)[number]) => Math.abs(a.u0 - b.u0) + Math.abs(a.u1 - b.u1) + Math.abs(a.inset - b.inset) < 1e-3;
-  const groups: { lv: number[]; g: (typeof per)[number] }[] = [];
-  per.forEach((g, i) => {
-    const last = groups[groups.length - 1];
-    if (last && same(last.g, g)) last.lv.push(i); else groups.push({ lv: [i], g });
+  const n = p.levels.length;
+  const regions = p.levels.map((l) => Region.of(l.rooms.map(roomRect)).inflate(EXT_WALL / 2));
+  const nrm = OUT[side];
+  const insetOf = (pt: Vec2) => side === 'front' ? pt[1] - o.y0 : side === 'rear' ? o.y1 - pt[1] : side === 'left' ? pt[0] - o.x0 : o.x1 - pt[0];
+  type Seg = { u0: number; u1: number; inset: number };
+  const segs: Seg[][] = regions.map((rg) => rg.loops().flatMap((lp) => loopEdges(lp)
+    .filter((e) => e.n[0] === nrm[0] && e.n[1] === nrm[1])
+    .map((e) => {
+      const ua = toU(fr, e.a[0], e.a[1]), ub = toU(fr, e.b[0], e.b[1]);
+      return { u0: Math.min(ua, ub), u1: Math.max(ua, ub), inset: Math.max(0, insetOf(e.a)) };
+    })));
+  const cuts = [...new Set(segs.flat().flatMap((g) => [g.u0, g.u1]).map((u) => Math.round(u * 1e4) / 1e4))].sort((a, b) => a - b);
+  // plan point at face position u, set back by d from the face plane
+  const at = (u: number, d: number): Vec2 => [fr.O[0] + u * fr.U[0] - d * fr.N[0], fr.O[1] + u * fr.U[1] - d * fr.N[1]];
+  const pieces: (Seg & { level: number })[] = [];
+  segs.forEach((ls, level) => {
+    for (const g of ls) {
+      const cs = [g.u0, ...cuts.filter((c) => c > g.u0 + 1e-3 && c < g.u1 - 1e-3), g.u1];
+      for (let k = 0; k < cs.length - 1; k++) pieces.push({ u0: cs[k], u1: cs[k + 1], inset: g.inset, level });
+    }
   });
   const ffl = (i: number) => p.levels[i].elevation;
-  // the slab at a step belongs to whichever storey is larger (a cantilever's floor, a terrace's deck)
-  const upperWins = (lo: (typeof per)[number], up: (typeof per)[number]) => up.u0 <= lo.u0 + 1e-3 && up.u1 >= lo.u1 - 1e-3 && up.inset <= lo.inset + 1e-3;
-  return groups.map(({ lv, g }, k) => {
-    const prev = groups[k - 1], next = groups[k + 1];
-    const z0 = !prev ? p.brief.plinth : upperWins(prev.g, g) ? ffl(lv[0]) - SLAB : ffl(lv[0]);
-    const z1 = !next ? rz + PARAPET : upperWins(g, next.g) ? ffl(next.lv[0]) - SLAB : ffl(next.lv[0]);
-    return { u0: g.u0, u1: g.u1, z0, z1, inset: g.inset, levels: lv, roof: !next };
+  // stack identical pieces on consecutive storeys
+  const stacks: { u0: number; u1: number; inset: number; lv: number[] }[] = [];
+  for (const pc of pieces.sort((a, b) => a.level - b.level)) {
+    const s = stacks.find((q) => Math.abs(q.u0 - pc.u0) + Math.abs(q.u1 - pc.u1) + Math.abs(q.inset - pc.inset) < 1e-3 && q.lv[q.lv.length - 1] === pc.level - 1);
+    if (s) s.lv.push(pc.level); else stacks.push({ u0: pc.u0, u1: pc.u1, inset: pc.inset, lv: [pc.level] });
+  }
+  const zones: FaceZone[] = stacks.map((s) => {
+    const a = s.lv[0], b = s.lv[s.lv.length - 1], um = (s.u0 + s.u1) / 2;
+    const inside = at(um, s.inset + 0.02), outside = at(um, s.inset - 0.02);
+    // bottom: on the plinth, or at a soffit where it overhangs the storey below
+    let z0 = p.brief.plinth, overhang = 0;
+    if (a > 0) {
+      const lo = regions[a - 1];
+      z0 = lo.contains(...inside) && lo.contains(...outside) ? ffl(a) : ffl(a) - SLAB;
+      if (!lo.contains(...inside)) {
+        for (let dd = 0.1; dd < 6; dd += 0.1) if (lo.contains(...at(um, s.inset + dd))) { overhang = dd; break; }
+        if (!overhang) overhang = 1.5;
+      }
+    }
+    // top: under the storey above, or an open edge (deck) / the main roof
+    let z1 = rz + PARAPET, roof = true, deck = false;
+    if (b < n - 1) {
+      roof = false;
+      const up = regions[b + 1];
+      z1 = up.contains(...inside) ? ffl(b + 1) - SLAB : ffl(b + 1);
+      deck = !up.contains(...inside);
+    }
+    return { u0: s.u0, u1: s.u1, z0, z1, inset: s.inset, levels: s.lv, roof, overhang, deck };
   });
+  // merge side-by-side zones with the same build-up
+  zones.sort((a, b) => a.levels[0] - b.levels[0] || a.u0 - b.u0);
+  const merged: FaceZone[] = [];
+  for (const z of zones) {
+    const m = merged.find((q) => Math.abs(q.u1 - z.u0) < 1e-3 && Math.abs(q.inset - z.inset) < 1e-3 && Math.abs(q.z0 - z.z0) < 1e-3 && Math.abs(q.z1 - z.z1) < 1e-3
+      && q.levels.join() === z.levels.join() && q.roof === z.roof && q.deck === z.deck && (q.overhang > 0) === (z.overhang > 0));
+    if (m) { m.u1 = z.u1; m.overhang = Math.min(m.overhang, z.overhang); } else merged.push({ ...z });
+  }
+  return merged;
 }

@@ -236,10 +236,19 @@ export function Inspector() {
       <section>
         <h2><span className="sc">Massing</span><span className="mono dim">push · pull</span></h2>
         <div className="body">
-          <div className="field"><span>Upper-floor cantilever</span><Stepper value={p.massing.cantilever} step={0.15} min={0} max={2.4} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, cantilever: n } }), 'massing-c')} /></div>
+          <div className="field"><span>Upper-floor cantilever</span><Stepper value={p.massing.cantilever} step={0.15} min={0} max={4.2} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, cantilever: n } }), 'massing-c')} /></div>
+          <div className="field"><span>Cantilever span</span>
+            <select value={p.massing.span} onChange={(e) => commit((pp) => ({ ...pp, massing: { ...pp.massing, span: e.target.value as 'full' | 'wing' } }))}>
+              <option value="wing">Wing beside the stair (L-plan)</option>
+              <option value="full">Full front</option>
+            </select>
+          </div>
+          <div className="field"><span>Wing slides back at rear</span><Stepper value={p.massing.slide} step={0.15} min={0} max={3} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, slide: n } }), 'massing-s')} /></div>
+          <div className="field"><span>Recessed entrance porch</span><Stepper value={p.massing.porch} step={0.15} min={0} max={2.4} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, porch: n } }), 'massing-p')} /></div>
           <div className="field"><span>Top-floor rear terrace</span><Stepper value={p.massing.terrace} step={0.15} min={0} max={3} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, terrace: n } }), 'massing-t')} /></div>
           <div className="field"><span>Floating roof lid</span><Stepper value={p.massing.lid} step={0.15} min={0} max={1.8} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, massing: { ...pp.massing, lid: n } }), 'massing-l')} /></div>
-          <p className="note">Upper floors push out over a covered porch; the top floor pulls back for a terrace; the lid floats over the parapet. 0 switches a move off. Plans, elevations, section, 3D and facades follow.</p>
+          <div className="field"><span>Columns under cantilever</span><input type="checkbox" checked={p.massing.columns} onChange={(e) => commit((pp) => ({ ...pp, massing: { ...pp.massing, columns: e.target.checked } }))} /></div>
+          <p className="note">The upper wing cantilevers over a covered porch (from {1.8 * 1000} mm it becomes a lounge bay on columns) and slides back at the rear for a terrace; the entrance recesses under the floor above. 0 switches a move off. Plans, elevations, section, 3D and facades follow the new outline.</p>
         </div>
       </section>
 

@@ -21,7 +21,7 @@ export const DEFAULT_BRIEF: Brief = {
   plinth: 0.45,
 };
 
-export const DEFAULT_MASSING: Massing = { cantilever: 1.2, terrace: 0, lid: 0.6 };
+export const DEFAULT_MASSING: Massing = { cantilever: 3.0, span: 'wing', slide: 1.5, porch: 1.5, terrace: 0, lid: 0.6, columns: true };
 
 export function defaultFacade(active = 'voronoi'): FacadeState {
   const t = getFacade(active);

@@ -54,8 +54,11 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
     pt.rect(x0, Y(Math.max(z0, z1)), x1 - x0, Math.abs(z1 - z0) * v.k, s);
   };
   // extent of each storey along the cut (massing steps show up here)
-  const span = (r: { x0: number; y0: number; x1: number; y1: number }): [number, number] => [Math.min(A(r.x0, r.y0), A(r.x1, r.y1)), Math.max(A(r.x0, r.y0), A(r.x1, r.y1))];
-  const spans = d.outlines.map(span);
+  const spans = d.regions.map((rg): [number, number] => {
+    const hit = rg.rects().filter((r) => C(r.x0, r.y0) < cut && C(r.x1, r.y1) > cut);
+    const rs = hit.length ? hit : rg.rects();
+    return [Math.min(...rs.map((r) => A(r.x0, r.y0))), Math.max(...rs.map((r) => A(r.x1, r.y1)))];
+  });
   const [lo, hi] = spans[0];
   const [tlo, thi] = spans[spans.length - 1];
   const levels = d.levels.map((L) => L.level);

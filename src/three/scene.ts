@@ -6,9 +6,10 @@ import { EXT_WALL, MUMTY_HEIGHT, PARAPET, SLAB } from '../model/units.ts';
 import { subtract, type Rect } from '../geometry/rect.ts';
 import { SIDES } from '../geometry/faces.ts';
 import { GeoBuilder } from './primMeshes.ts';
-import { terraceStrips } from '../geometry/massing.ts';
+import { Region, loopEdges, shapes } from '../geometry/region.ts';
+import type { Vec2 } from '../model/types.ts';
 
-const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: '#9cc3cf', frame: '#3b3f42', door: '#a88866', mumty: '#ddd8cc', lid: '#f1efe9', furn: '#d9d1c1', soft: '#c9bfae', wet: '#e9edec' };
+const TONE = { wall: '#e6e1d5', slab: '#cdc7ba', plinth: '#b9b2a3', ground: '#ebe7de', glass: '#9cc3cf', frame: '#3b3f42', door: '#a88866', mumty: '#ddd8cc', column: '#d4cfc4', lid: '#f1efe9', furn: '#d9d1c1', soft: '#c9bfae', wet: '#e9edec' };
 const GLASS_OPACITY = 0.28;
 
 /** plan rect + height range → world box (X = x, Y = z, Z = −y) */
@@ -32,12 +33,39 @@ function glazing(gb: GeoBuilder, run: 'x' | 'y', c: number, a: number, b: number
   put(a + f, b - f, z0 + f, z1 - f, TONE.glass, false, GLASS_OPACITY);
 }
 
-/** glass balustrade along the open edges of a deck strip, 1.0 m above the deck */
-function balustrade(gb: GeoBuilder, r: Rect & { open: 'y0' | 'y1' }, z: number) {
-  const t = 0.03, h = 1.0;
-  const edge: [number, number, number, number] = r.open === 'y1' ? [r.x0, r.y1 - t, r.x1, r.y1] : [r.x0, r.y0, r.x1, r.y0 + t];
-  const runs: [number, number, number, number][] = [edge, [r.x0, r.y0, r.x0 + t, r.y1], [r.x1 - t, r.y0, r.x1, r.y1]];
-  for (const [x0, y0, x1, y1] of runs) {
+const V = (pt: Vec2, z: number) => new THREE.Vector3(pt[0], z, -pt[1]);
+
+/** a flat slab of any rectilinear outline, holes allowed */
+function prism(gb: GeoBuilder, rg: Region, z0: number, z1: number, hex: string, edges = true) {
+  for (const { outer, holes } of shapes(rg.loops())) {
+    const v2 = (l: Vec2[]) => l.map(([x, y]) => new THREE.Vector2(x, y));
+    const tris = THREE.ShapeUtils.triangulateShape(v2(outer), holes.map(v2));
+    const all = [...outer, ...holes.flat()];
+    for (const [a, b, c] of tris) {
+      gb.tri(V(all[a], z1), V(all[b], z1), V(all[c], z1), hex, 1, V(all[a], z1 - 1));
+      gb.tri(V(all[a], z0), V(all[b], z0), V(all[c], z0), hex, 1, V(all[a], z0 + 1));
+    }
+    for (const lp of [outer, ...holes]) for (const e of loopEdges(lp)) {
+      const ref = V([(e.a[0] + e.b[0]) / 2 - e.n[0] * 0.05, (e.a[1] + e.b[1]) / 2 - e.n[1] * 0.05], (z0 + z1) / 2);
+      gb.quad(V(e.a, z0), V(e.b, z0), V(e.b, z1), V(e.a, z1), hex, 1, ref);
+      if (edges) { gb.edge(V(e.a, z0), V(e.b, z0)); gb.edge(V(e.a, z1), V(e.b, z1)); gb.edge(V(e.a, z0), V(e.a, z1)); }
+    }
+  }
+}
+
+/** plan rect of a strip of thickness t laid inside an outline edge */
+const stripIn = (e: { a: Vec2; b: Vec2; n: Vec2 }, t: number, off = 0): [number, number, number, number] => {
+  const ax = e.a[0] - e.n[0] * off, ay = e.a[1] - e.n[1] * off, bx = e.b[0] - e.n[0] * (off + t), by = e.b[1] - e.n[1] * (off + t);
+  return [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)];
+};
+
+/** glass balustrade on the open edges of a roof deck, 1.0 m above it */
+function balustrades(gb: GeoBuilder, deck: Region, upper: Region, z: number) {
+  const h = 1.0;
+  for (const lp of deck.loops()) for (const e of loopEdges(lp)) {
+    const mx = (e.a[0] + e.b[0]) / 2 + e.n[0] * 0.05, my = (e.a[1] + e.b[1]) / 2 + e.n[1] * 0.05;
+    if (upper.contains(mx, my)) continue;
+    const [x0, y0, x1, y1] = stripIn(e, 0.03, 0.04);
     pbox(gb, x0, y0, x1, y1, z, z + h - 0.05, TONE.glass, false, 0.3);
     pbox(gb, x0 - 0.01, y0 - 0.01, x1 + 0.01, y1 + 0.01, z + h - 0.05, z + h, TONE.frame, true);
   }
@@ -55,11 +83,12 @@ export function buildHouse(d: Derived): THREE.Group {
   for (const [a, b] of [[[0, 0], [s.width, 0]], [[s.width, 0], [s.width, s.depth]], [[s.width, s.depth], [0, s.depth]], [[0, s.depth], [0, 0]]]) {
     gb.edge(new THREE.Vector3(a[0], 0, -a[1]), new THREE.Vector3(b[0], 0, -b[1]));
   }
-  const ol = d.outlines;
+  const rg = d.regions;
   const n = d.levels.length;
   // plinth under the ground floor only: a cantilever hovers over open ground
-  const g0 = ol[0];
-  pbox(gb, g0.x0, g0.y0, g0.x1, g0.y1, 0, p.brief.plinth, TONE.plinth);
+  prism(gb, rg[0], 0, p.brief.plinth, TONE.plinth);
+  // columns carrying a long cantilever
+  for (const c of d.columns) pbox(gb, c.x - c.s / 2, c.y - c.s / 2, c.x + c.s / 2, c.y + c.s / 2, 0, c.z1, TONE.column);
   // walls per level, openings cut out
   d.levels.forEach((L, i) => {
     const z0 = L.level.elevation;
@@ -88,35 +117,33 @@ export function buildHouse(d: Derived): THREE.Group {
       pbox(gb, r.x0 + 0.01, r.y0 + 0.01, r.x1 - 0.01, r.y1 - 0.01, z0, z0 + Math.max(0.01, h), FURN_TONE[f.kind] ?? TONE.furn, f.kind !== 'rug');
     }
     // slab over this level: covers this level and the one above (a cantilever floor, a terrace deck)
-    const a = ol[i], b = ol[i + 1] ?? ol[i];
-    pbox(gb, Math.min(a.x0, b.x0), Math.min(a.y0, b.y0), Math.max(a.x1, b.x1), Math.max(a.y1, b.y1), z1, z1 + SLAB, TONE.slab);
+    prism(gb, rg[i].union(rg[i + 1] ?? rg[i]), z1, z1 + SLAB, TONE.slab);
     // outline edges of this storey's wall mass (walls were drawn without per-piece edges)
-    for (const [x, y] of [[a.x0, a.y0], [a.x1, a.y0], [a.x1, a.y1], [a.x0, a.y1]]) gb.edge(new THREE.Vector3(x, z0, -y), new THREE.Vector3(x, z1, -y));
+    for (const lp of rg[i].loops()) for (const pt of lp) gb.edge(V(pt, z0), V(pt, z1));
   });
-  // parapet on the top storey
+  // parapet round the top storey
   const T = EXT_WALL;
-  const top = ol[n - 1];
-  pbox(gb, top.x0, top.y0, top.x1, top.y0 + T, roofZ, roofZ + PARAPET, TONE.wall);
-  pbox(gb, top.x0, top.y1 - T, top.x1, top.y1, roofZ, roofZ + PARAPET, TONE.wall);
-  pbox(gb, top.x0, top.y0 + T, top.x0 + T, top.y1 - T, roofZ, roofZ + PARAPET, TONE.wall);
-  pbox(gb, top.x1 - T, top.y0 + T, top.x1, top.y1 - T, roofZ, roofZ + PARAPET, TONE.wall);
-  // glass balustrade round any roof terrace a stepped-back storey leaves on the one below
-  for (let i = 1; i < n; i++) {
-    const lo = ol[i - 1], up = ol[i], z = d.levels[i].level.elevation;
-    for (const r of terraceStrips(lo, up)) balustrade(gb, r, z);
+  const top = rg[n - 1];
+  for (const lp of top.loops()) for (const e of loopEdges(lp)) {
+    const [x0, y0, x1, y1] = stripIn(e, T);
+    pbox(gb, x0, y0, x1, y1, roofZ, roofZ + PARAPET, TONE.wall);
   }
-  // floating roof lid: a thin brim on a shadow gap over the parapet
+  // glass balustrade round any roof terrace a stepped-back storey leaves on the one below
+  for (let i = 1; i < n; i++) balustrades(gb, rg[i - 1].minus(rg[i]), rg[i], d.levels[i].level.elevation);
+  // floating roof lid: a thin brim on a shadow gap over the parapet, following the top outline
   const lid = p.massing?.lid ?? 0;
   if (lid > 0) {
     const zt = roofZ + PARAPET + 0.12, zb = zt + 0.22;
-    const O = { x0: top.x0 - lid, y0: top.y0 - lid, x1: top.x1 + lid, y1: top.y1 + lid };
-    const I = { x0: top.x0 + 0.6, y0: top.y0 + 0.6, x1: top.x1 - 0.6, y1: top.y1 - 0.6 };
-    pbox(gb, O.x0, O.y0, O.x1, I.y0, zt, zb, TONE.lid);
-    pbox(gb, O.x0, I.y1, O.x1, O.y1, zt, zb, TONE.lid);
-    pbox(gb, O.x0, I.y0, I.x0, I.y1, zt, zb, TONE.lid);
-    pbox(gb, I.x1, I.y0, O.x1, I.y1, zt, zb, TONE.lid);
-    // hidden posts set back in the shadow gap
-    for (const [x, y] of [[top.x0 + 0.3, top.y0 + 0.3], [top.x1 - 0.3, top.y0 + 0.3], [top.x1 - 0.3, top.y1 - 0.3], [top.x0 + 0.3, top.y1 - 0.3]]) pbox(gb, x - 0.05, y - 0.05, x + 0.05, y + 0.05, roofZ + PARAPET, zt, TONE.frame, false);
+    prism(gb, top.inflate(lid).minus(top.erode(0.6)), zt, zb, TONE.lid);
+    // hidden posts set back in the shadow gap at the outer corners
+    for (const lp of top.loops()) lp.forEach((pt, k) => {
+      const a = lp[(k - 1 + lp.length) % lp.length], b = lp[(k + 1) % lp.length];
+      const turn = (pt[0] - a[0]) * (b[1] - pt[1]) - (pt[1] - a[1]) * (b[0] - pt[0]);
+      if (turn <= 0) return;
+      const ix = Math.sign(a[0] - pt[0] + b[0] - pt[0]), iy = Math.sign(a[1] - pt[1] + b[1] - pt[1]);
+      const x = pt[0] + ix * 0.3, y = pt[1] + iy * 0.3;
+      pbox(gb, x - 0.05, y - 0.05, x + 0.05, y + 0.05, roofZ + PARAPET, zt, TONE.frame, false);
+    });
   }
   // stair head-room
   const sp = p.stair.position;

@@ -12,11 +12,14 @@ import type { ParamSet } from './types.ts';
 import { checkFacade, type FacadeIssue } from '../facades/validate.ts';
 import { validate } from './validators.ts';
 import { furnishRoom, type Furn } from '../geometry/furniture.ts';
-import { applyMassing, levelOutline } from '../geometry/massing.ts';
+import { BAY, applyMassing, levelRegion } from '../geometry/massing.ts';
+import type { Region } from '../geometry/region.ts';
 import { isPlanar, runZoned } from '../facades/zones.ts';
-import { EXT_WALL } from './units.ts';
+import { EXT_WALL, SLAB } from './units.ts';
 
 export interface LevelDerived { level: Level; walls: Wall[]; openings: Opening[]; clear: Map<string, Rect>; furniture: Furn[] }
+
+export interface Column { x: number; y: number; s: number; z1: number }
 
 export interface FaceDerived {
   face: Face;
@@ -33,8 +36,12 @@ export interface Derived {
   project: Project;
   footprint: Rect;
   outer: Rect;
-  /** outer wall face rectangle of every level (differs per level with massing moves) */
+  /** true outer outline of every level (L-shapes, notches and bays from the massing moves) */
+  regions: Region[];
+  /** bounding rectangle of each level's outline */
   outlines: Rect[];
+  /** free-standing columns under a long cantilever: plan centre, side, top */
+  columns: Column[];
   levels: LevelDerived[];
   openings: Opening[];
   stair: StairCalc;
@@ -52,15 +59,17 @@ export function syncStair(p: Project): Level[] {
 }
 
 /** a storey that steps back over the one below gets a glazed door out onto that terrace */
-function terraceDoor(p: Project, level: Level, openings: Opening[]) {
-  const i = p.levels.indexOf(level);
-  if (i < 1) return;
-  const up = levelOutline(level), lo = levelOutline(p.levels[i - 1]);
-  if (lo.y1 - up.y1 < 0.3) return;
+function terraceDoor(level: Level, openings: Opening[], below: Region | undefined) {
+  if (!below) return;
   const rank: Record<string, number> = { family: 3, living: 3, bedroom: 2, study: 1 };
+  const type = (o: Opening) => level.rooms.find((r) => r.id === o.roomId)?.type ?? '';
+  const outside = (o: Opening): [number, number] => {
+    const d = o.side === 'front' || o.side === 'left' ? -0.6 : 0.6;
+    return o.run === 'x' ? [o.center, o.c + d] : [o.c + d, o.center];
+  };
   const pick = openings
-    .filter((o) => o.kind === 'window' && o.side === 'rear' && rank[level.rooms.find((r) => r.id === o.roomId)?.type ?? ''])
-    .sort((a, b) => rank[level.rooms.find((r) => r.id === b.roomId)!.type] - rank[level.rooms.find((r) => r.id === a.roomId)!.type] || b.width - a.width)[0];
+    .filter((o) => o.kind === 'window' && o.external && rank[type(o)] && below.contains(...outside(o)))
+    .sort((a, b) => rank[type(b)] - rank[type(a)] || b.width - a.width)[0];
   if (!pick) return;
   pick.kind = 'garden';
   pick.sill = 0;
@@ -68,6 +77,31 @@ function terraceDoor(p: Project, level: Level, openings: Opening[]) {
   pick.leaves = pick.width >= 1.2 ? 2 : 1;
   const a = pick.width * (pick.head - pick.sill);
   pick.glazedArea = a * 0.7; pick.ventArea = a * 0.5;
+}
+
+/** columns at the free corners of a long cantilever, kept clear of the entrance path */
+function cantileverColumns(p: Project, regions: Region[], ent: Opening | undefined): Column[] {
+  const m = p.massing;
+  if (!m?.columns || m.cantilever < BAY || regions.length < 2) return [];
+  const cov = regions[1].minus(regions[0]);
+  if (cov.empty) return [];
+  const front = regions[1].bbox().y0;
+  const strip = cov.rects().filter((r) => Math.abs(r.y0 - front) < 1e-3);
+  if (!strip.length) return [];
+  const x0 = Math.min(...strip.map((r) => r.x0)), x1 = Math.max(...strip.map((r) => r.x1));
+  const s = 0.3, y = front + s / 2 + 0.05, z1 = p.levels[1].elevation - SLAB;
+  const xs = [x0 + s / 2 + 0.05, x1 - s / 2 - 0.05];
+  if (x1 - x0 > 6.5) xs.splice(1, 0, (x0 + x1) / 2);
+  const clear = ent && ent.side === 'front' && ent.run === 'x' ? [ent.center - ent.width / 2 - 0.45 - s / 2, ent.center + ent.width / 2 + 0.45 + s / 2] : null;
+  const out: Column[] = [];
+  const fits = (x: number) => x >= x0 + s / 2 - 1e-3 && x <= x1 - s / 2 + 1e-3 && !out.some((c) => Math.abs(c.x - x) < 1);
+  for (const x of xs) {
+    // a column on the entrance path moves to whichever side of it still lands under the cantilever
+    const tries = clear && x > clear[0] && x < clear[1] ? [clear[0], clear[1]].sort((a, b) => Math.abs(a - x) - Math.abs(b - x)) : [x];
+    const at = tries.find(fits);
+    if (at !== undefined) out.push({ x: at, y, s, z1 });
+  }
+  return out;
 }
 
 export function faceOpenings(face: Face, levels: LevelDerived[]): FaceOpening[] {
@@ -120,12 +154,14 @@ export function settingFor(p: Project, key: FaceKey) {
 }
 
 export function derive(p0: Project): Derived {
-  const p: Project = { ...p0, levels: applyMassing(syncStair(p0), p0.massing ?? { cantilever: 0, terrace: 0, lid: 0 }) };
+  const m0 = p0.massing ?? { cantilever: 0, span: 'full', slide: 0, porch: 0, terrace: 0, lid: 0, columns: false };
+  const p: Project = { ...p0, levels: applyMassing(syncStair(p0), m0, p0.stair.position) };
+  const regions = p.levels.map(levelRegion);
   const keyFor = (s: Side) => faceKeyOf(s, p.site.northAngle);
-  const levels: LevelDerived[] = p.levels.map((level) => {
+  const levels: LevelDerived[] = p.levels.map((level, li) => {
     const walls = deriveWalls(level);
     const openings = deriveOpenings(level, walls, keyFor, p.site.latitude, p.openingOverrides);
-    terraceDoor(p, level, openings);
+    terraceDoor(level, openings, regions[li - 1]);
     const clear = new Map(level.rooms.map((r) => [r.id, clearRect(r, walls)]));
     const furniture = level.rooms.flatMap((r) => furnishRoom(r, clear.get(r.id)!, openings));
     return { level, walls, openings, clear, furniture };
@@ -155,9 +191,10 @@ export function derive(p0: Project): Derived {
     faces[s] = { face, type: st.type, params: st.params, palette: st.palette, orient, out, issues: checkFacade(face, out), overridden: st.overridden };
   }
   const o = outerRect(fp);
-  const outlines = p.levels.map(levelOutline);
-  const builtUp = outlines.reduce((sum, r) => sum + area(r), 0) + (stair ? (sp.w + 0.23) * (sp.h + 0.23) : 0);
-  const d: Derived = { project: p, footprint: fp, outer: o, outlines, levels, openings, stair, faces, sun, warnings: [], builtUp };
+  const outlines = regions.map((r) => r.bbox());
+  const columns = cantileverColumns(p, regions, levels[0]?.openings.find((x) => x.kind === 'entrance'));
+  const builtUp = regions.reduce((sum, r) => sum + r.area(), 0) + (stair ? (sp.w + 0.23) * (sp.h + 0.23) : 0);
+  const d: Derived = { project: p, footprint: fp, outer: o, regions, outlines, columns, levels, openings, stair, faces, sun, warnings: [], builtUp };
   d.warnings = validate(d);
   return d;
 }

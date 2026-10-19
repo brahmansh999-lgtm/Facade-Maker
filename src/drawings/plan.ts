@@ -12,7 +12,7 @@ import { View, W, type Painter } from './painter.ts';
 import { ACCENT, INK, PAPER, mix, shade } from './color.ts';
 import { AREA, fitScale } from './sheet.ts';
 import { drawFurniture } from './furniturePlan.ts';
-import { terraceStrips } from '../geometry/massing.ts';
+import { Region, loopEdges } from '../geometry/region.ts';
 import { TXT, bubble, chainDim, northArrow, runningDim, scaleBar, sectionMark } from './annot.ts';
 
 export const POCHE = '#2b2a27';
@@ -120,7 +120,7 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
     }
   }
   for (const x of g.xs) for (const y of g.ys) {
-    if (x.v < d.footprint.x0 - 1e-3 || x.v > d.footprint.x1 + 1e-3 || y.v < d.footprint.y0 - 1e-3 || y.v > d.footprint.y1 + 1e-3) continue;
+    if (!d.regions[li].contains(x.v, y.v)) continue;
     pt.rect(v.X(x.v - 0.115), v.Y(y.v + 0.115), 0.23 * v.k, 0.23 * v.k, { fill: POCHE, stroke: POCHE, sw: W.CUT });
   }
   pt.end();
@@ -184,7 +184,7 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
   if (lvl.index === 0) {
     const ent = L.openings.find((x) => x.kind === 'entrance');
     if (ent && ent.side === 'front') {
-      const y = d.outlines[0].y0;
+      const y = ent.c - EXT_WALL / 2;
       const nSteps = Math.max(1, Math.round(d.project.brief.plinth / 0.15));
       for (let i = 0; i <= nSteps; i++) {
         const yy = y - i * 0.3;
@@ -407,54 +407,78 @@ function drawFinishes(pt: Painter, v: View, L: Derived['levels'][number]) {
   pt.end();
 }
 
-/** covered porch under a cantilever, roof terraces, overhead cantilever and roof lid */
+/** covered porch under a cantilever, roof terraces, overhead cantilever, columns and roof lid */
 function drawMassingPlan(pt: Painter, d: Derived, li: number, v: View) {
-  const ol = d.outlines, cur = ol[li], above = ol[li + 1], below = ol[li - 1];
+  const rg = d.regions, cur = rg[li], above = rg[li + 1], below = rg[li - 1];
   const R = (r: Rect, s: Parameters<Painter['rect']>[4]) => pt.rect(v.X(r.x0), v.Y(r.y1), rw(r) * v.k, rh(r) * v.k, s);
+  const outline = (r: Region, s: Parameters<Painter['poly']>[2]) => { for (const lp of r.loops()) pt.poly(lp.flatMap(([x, y]) => [v.X(x), v.Y(y)]), true, s); };
   const label = (r: Rect, t: string, sub?: string) => {
     const cx = v.X((r.x0 + r.x1) / 2), cy = v.Y((r.y0 + r.y1) / 2);
     pt.rect(cx - t.length * 0.62 - 1, cy - 2.2, t.length * 1.24 + 2, sub ? 5.2 : 3.2, { fill: PAPER, opacity: 0.85 });
     pt.text(cx, cy, t, { size: 1.6, anchor: 'middle', weight: 600, spacing: 0.15 });
     if (sub) pt.text(cx, cy + 2.4, sub, { size: 1.25, anchor: 'middle', font: 'mono' });
   };
+  const biggest = (r: Region) => r.rects().sort((a, b) => area(b) - area(a))[0];
   pt.begin('massing');
-  // covered porch: ground under the floor above where that floor projects
-  if (above && above.y0 < cur.y0 - 0.3) {
-    const r: Rect = { x0: Math.max(cur.x0, above.x0), x1: Math.min(cur.x1, above.x1), y0: above.y0, y1: cur.y0 };
-    R(r, { fill: '#e7e2d6' });
-    for (let x = r.x0 + 0.6; x < r.x1 - 0.05; x += 0.6) pt.line(v.X(x), v.Y(r.y0), v.X(x), v.Y(r.y1), { stroke: '#cfc7b6', sw: W.THIN * 0.7 });
-    for (let y = r.y0 + 0.6; y < r.y1 - 0.05; y += 0.6) pt.line(v.X(r.x0), v.Y(y), v.X(r.x1), v.Y(y), { stroke: '#cfc7b6', sw: W.THIN * 0.7 });
-    R(r, { stroke: INK, sw: W.BEYOND, dash: [2.2, 1.1] });
-    label({ ...r, x0: r.x1 - Math.min(3.6, rw(r)), x1: r.x1 }, 'COVERED PORCH', `CANTILEVER ${(cur.y0 - above.y0).toFixed(2)} OVER`);
+  // covered porch: open ground under the floor above where that floor projects
+  if (above) {
+    const cov = above.minus(cur);
+    if (!cov.empty && cov.area() > 0.5) {
+      for (const r of cov.rects()) {
+        R(r, { fill: '#e7e2d6' });
+        for (let x = Math.ceil(r.x0 / 0.6) * 0.6; x < r.x1 - 0.05; x += 0.6) pt.line(v.X(x), v.Y(r.y0), v.X(x), v.Y(r.y1), { stroke: '#cfc7b6', sw: W.THIN * 0.7 });
+        for (let y = Math.ceil(r.y0 / 0.6) * 0.6; y < r.y1 - 0.05; y += 0.6) pt.line(v.X(r.x0), v.Y(y), v.X(r.x1), v.Y(y), { stroke: '#cfc7b6', sw: W.THIN * 0.7 });
+      }
+      outline(cov, { stroke: INK, sw: W.BEYOND, dash: [2.2, 1.1] });
+      const big = biggest(cov), proj = cur.bbox().y0 - above.bbox().y0;
+      label(big, li === 0 ? 'COVERED PORCH' : 'COVERED DECK', proj > 0.3 ? `CANTILEVER ${proj.toFixed(2)} OVER` : 'FLOOR OVER');
+    }
   }
-  // this floor projects past the one below: mark the cantilever edge
-  if (below && cur.y0 < below.y0 - 0.3) {
-    pt.line(v.X(cur.x0), v.Y(below.y0), v.X(cur.x1), v.Y(below.y0), { stroke: INK, sw: W.THIN, dash: [1.4, 0.9] });
-    pt.text(v.X(cur.x1) + 1.2, v.Y(below.y0) + 0.5, 'LINE OF FLOOR BELOW', { size: 1.2, font: 'mono' });
+  // this floor projects past the one below: dashed line of the floor below inside this outline
+  if (below) {
+    for (const lp of below.loops()) for (const e of loopEdges(lp)) {
+      const mx = (e.a[0] + e.b[0]) / 2, my = (e.a[1] + e.b[1]) / 2;
+      if (!cur.contains(mx + e.n[0] * 0.05, my + e.n[1] * 0.05) || !cur.contains(mx - e.n[0] * 0.05, my - e.n[1] * 0.05)) continue;
+      pt.line(v.X(e.a[0]), v.Y(e.a[1]), v.X(e.b[0]), v.Y(e.b[1]), { stroke: INK, sw: W.THIN, dash: [1.4, 0.9] });
+    }
+    const cant = cur.minus(below);
+    if (!cant.empty && cant.area() > 0.5) {
+      const r = biggest(cant);
+      pt.text(v.X(r.x0) + 1, v.Y(r.y0) - 1, `CANTILEVER ${(below.bbox().y0 - cur.bbox().y0).toFixed(2)} · LINE OF FLOOR BELOW DASHED`, { size: 1.2, font: 'mono' });
+    }
   }
   // terrace on the roof of the floor below, left by this floor stepping back
   if (below) {
-    for (const t of terraceStrips(below, cur)) {
+    const deck = below.minus(cur);
+    for (const t of deck.rects()) {
       R(t, { fill: '#ebe4d4' });
       const along = rw(t) >= rh(t);
       if (along) for (let y = t.y0 + 0.14; y < t.y1 - 0.02; y += 0.14) pt.line(v.X(t.x0), v.Y(y), v.X(t.x1), v.Y(y), { stroke: '#cbbfa5', sw: W.THIN * 0.7 });
       else for (let x = t.x0 + 0.14; x < t.x1 - 0.02; x += 0.14) pt.line(v.X(x), v.Y(t.y0), v.X(x), v.Y(t.y1), { stroke: '#cbbfa5', sw: W.THIN * 0.7 });
-      // glass balustrade on the open edges
-      const yo = t.open === 'y1' ? t.y1 : t.y0, yi = t.open === 'y1' ? t.y1 - 0.05 : t.y0 + 0.05;
-      for (const yy of [yo, yi]) pt.line(v.X(t.x0), v.Y(yy), v.X(t.x1), v.Y(yy), { stroke: INK, sw: W.PROJ });
-      for (const xx of [t.x0 + 0.025, t.x1 - 0.025]) pt.line(v.X(xx), v.Y(t.y0), v.X(xx), v.Y(t.y1), { stroke: INK, sw: W.PROJ });
-      label(t, 'ROOF TERRACE', `FFL ${levelText(d.levels[li].level.elevation - 0.03)} · FALL 1:80`);
-      const ax = v.X(t.x1 - 1.2), ay0 = v.Y((t.y0 + t.y1) / 2), ay1 = v.Y(t.open === 'y1' ? t.y1 - 0.25 : t.y0 + 0.25);
-      pt.line(ax, ay0, ax, ay1, { stroke: INK, sw: W.BEYOND });
-      pt.poly([ax, ay1, ax - 0.7, ay1 + (ay1 > ay0 ? -1.6 : 1.6), ax + 0.7, ay1 + (ay1 > ay0 ? -1.6 : 1.6)], true, { fill: INK });
     }
+    // glass balustrade on the open edges
+    for (const lp of deck.loops()) for (const e of loopEdges(lp)) {
+      const mx = (e.a[0] + e.b[0]) / 2, my = (e.a[1] + e.b[1]) / 2;
+      if (cur.contains(mx + e.n[0] * 0.05, my + e.n[1] * 0.05)) continue;
+      for (const off of [0.0, 0.06]) pt.line(v.X(e.a[0] - e.n[0] * off), v.Y(e.a[1] - e.n[1] * off), v.X(e.b[0] - e.n[0] * off), v.Y(e.b[1] - e.n[1] * off), { stroke: INK, sw: W.PROJ });
+    }
+    if (!deck.empty && deck.area() > 1) {
+      const t = biggest(deck);
+      label({ ...t, x1: t.x0 + Math.min(3.4, rw(t)) }, 'ROOF TERRACE', `FFL ${levelText(d.levels[li].level.elevation - 0.03)} · FALL 1:80`);
+    }
+  }
+  // columns under a cantilever
+  if (li === 0) for (const c of d.columns) {
+    pt.rect(v.X(c.x - c.s / 2), v.Y(c.y + c.s / 2), c.s * v.k, c.s * v.k, { fill: POCHE, stroke: POCHE, sw: W.CUT });
+    pt.text(v.X(c.x) + 2.2, v.Y(c.y) + 0.6, 'C1 300×300 RCC', { size: 1.15, font: 'mono' });
   }
   // roof lid over the top floor
   const lid = d.project.massing?.lid ?? 0;
   if (li === d.levels.length - 1 && lid > 0) {
-    const r: Rect = { x0: cur.x0 - lid, x1: cur.x1 + lid, y0: cur.y0 - lid, y1: cur.y1 + lid };
-    R(r, { stroke: INK, sw: W.THIN, dash: [3, 0.8, 0.6, 0.8] });
-    pt.text(v.X(r.x0) + 1, v.Y(r.y0) - 1, `ROOF LID OVER (+${lid.toFixed(2)})`, { size: 1.2, font: 'mono' });
+    const r = cur.inflate(lid);
+    outline(r, { stroke: INK, sw: W.THIN, dash: [3, 0.8, 0.6, 0.8] });
+    const bb = r.bbox();
+    pt.text(v.X(bb.x0) + 1, v.Y(bb.y0) - 1, `ROOF LID OVER (+${lid.toFixed(2)})`, { size: 1.2, font: 'mono' });
   }
   pt.end();
 }

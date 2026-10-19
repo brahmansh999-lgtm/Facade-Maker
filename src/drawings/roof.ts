@@ -9,7 +9,7 @@ import { INK, PAPER, mix } from './color.ts';
 import { AREA, fitScale } from './sheet.ts';
 import { TXT, bubble, chainDim, northArrow, scaleBar, sectionMark } from './annot.ts';
 import { sectionLine } from './plan.ts';
-import { terraceStrips } from '../geometry/massing.ts';
+import { Region, loopEdges } from '../geometry/region.ts';
 
 export function roofLayout(d: Derived) {
   const s = d.project.site;
@@ -58,24 +58,39 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
   }
   if (ent) {
     // entrance path
-    R(ent.center - 0.6, 0, ent.center + 0.6, d.outlines[0].y0 - 0.9, { stroke: INK, sw: W.BEYOND, dash: [1, 0.8] });
+    R(ent.center - 0.6, 0, ent.center + 0.6, ent.c - EXT_WALL / 2 - 0.9, { stroke: INK, sw: W.BEYOND, dash: [1, 0.8] });
   }
 
+  const rg = d.regions, nl = rg.length;
+  const outline = (r: Region, st: Parameters<Painter['poly']>[2]) => { for (const lp of r.loops()) pt.poly(lp.flatMap(([x, y]) => [X(x), Y(y)]), true, st); };
   // lower roofs left open by stepped storeys: terraces with decking
-  const ol = d.outlines, nl = ol.length;
   for (let i = 0; i < nl - 1; i++) {
-    for (const t of terraceStrips(ol[i], ol[i + 1])) {
-      R(t.x0, t.y0, t.x1, t.y1, { fill: '#ebe4d4', stroke: INK, sw: W.OUTLINE });
+    const deck = rg[i].minus(rg[i + 1]);
+    if (deck.empty) continue;
+    for (const t of deck.rects()) {
+      R(t.x0, t.y0, t.x1, t.y1, { fill: '#ebe4d4' });
       for (let x = t.x0 + 0.14; x < t.x1 - 0.02; x += 0.14) pt.line(X(x), Y(t.y0), X(x), Y(t.y1), { stroke: '#cbbfa5', sw: W.THIN * 0.6 });
-      pt.text(X((t.x0 + t.x1) / 2), Y((t.y0 + t.y1) / 2) + 0.5, `TERRACE L${i}`, { size: 1.5, anchor: 'middle', weight: 600, spacing: 0.15 });
     }
+    outline(deck, { stroke: INK, sw: W.OUTLINE });
+    const t = deck.rects().sort((a, b) => (b.x1 - b.x0) * (b.y1 - b.y0) - (a.x1 - a.x0) * (a.y1 - a.y0))[0];
+    if ((t.x1 - t.x0) * (t.y1 - t.y0) > 1) pt.text(X((t.x0 + t.x1) / 2), Y((t.y0 + t.y1) / 2) + 0.5, `TERRACE L${i}`, { size: 1.5, anchor: 'middle', weight: 600, spacing: 0.15 });
   }
   // building roof (top storey)
-  const o = ol[nl - 1];
-  R(o.x0, o.y0, o.x1, o.y1, { fill: '#e9e5dc', stroke: INK, sw: W.OUTLINE });
-  R(o.x0 + EXT_WALL, o.y0 + EXT_WALL, o.x1 - EXT_WALL, o.y1 - EXT_WALL, { stroke: INK, sw: W.PROJ });
+  const top = rg[nl - 1];
+  const o = top.bbox();
+  outline(top, { fill: '#e9e5dc', stroke: INK, sw: W.OUTLINE });
+  outline(top.erode(EXT_WALL), { stroke: INK, sw: W.PROJ });
+  // the cantilever's edge over open ground, seen from above
+  for (const lp of rg[0].loops()) for (const e of loopEdges(lp)) {
+    const mx = (e.a[0] + e.b[0]) / 2, my = (e.a[1] + e.b[1]) / 2;
+    if (top.contains(mx + e.n[0] * 0.05, my + e.n[1] * 0.05) && top.contains(mx - e.n[0] * 0.05, my - e.n[1] * 0.05)) pt.line(X(e.a[0]), Y(e.a[1]), X(e.b[0]), Y(e.b[1]), { stroke: INK, sw: W.THIN, dash: [1.4, 0.9] });
+  }
   // falls to two outlets at the rear corners
-  const outlets: [number, number][] = [[o.x0 + 0.45, o.y1 - 0.45], [o.x1 - 0.45, o.y1 - 0.45]];
+  // outlets in the two rear-most corners of the roof
+  const corners = top.loops().flat().sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  const rearL = corners.filter((c) => top.contains(c[0] + 0.45, c[1] - 0.45)).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0] ?? [o.x0, o.y1];
+  const rearR = corners.filter((c) => top.contains(c[0] - 0.45, c[1] - 0.45)).sort((a, b) => b[1] - a[1] || b[0] - a[0])[0] ?? [o.x1, o.y1];
+  const outlets: [number, number][] = [[rearL[0] + 0.45, rearL[1] - 0.45], [rearR[0] - 0.45, rearR[1] - 0.45]];
   const sp = p.stair.position;
   for (const [ox, oy] of outlets) {
     pt.circle(X(ox), Y(oy), 0.075 * v.k + 0.4, { stroke: INK, sw: W.PROJ, fill: PAPER });
@@ -89,15 +104,15 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
     pt.poly([X(tx), Y(ty), X(tx) - Math.cos(ang - 0.4) * 2, Y(ty) - Math.sin(ang - 0.4) * 2, X(tx) - Math.cos(ang + 0.4) * 2, Y(ty) - Math.sin(ang + 0.4) * 2], true, { fill: INK });
     pt.text((X(fx) + X(tx)) / 2 + 1.5, (Y(fy) + Y(ty)) / 2, 'FALL 1:100', { size: 1.3, font: 'mono' });
   }
-  // floating roof lid: a brim ring over the parapet
+  // floating roof lid: a brim ring over the parapet, following the top outline
   const lid = p.massing?.lid ?? 0;
   if (lid > 0) {
-    const Ox0 = o.x0 - lid, Oy0 = o.y0 - lid, Ox1 = o.x1 + lid, Oy1 = o.y1 + lid, I = 0.6;
-    const ring: [number, number, number, number][] = [[Ox0, Oy0, Ox1, o.y0 + I], [Ox0, o.y1 - I, Ox1, Oy1], [Ox0, o.y0 + I, o.x0 + I, o.y1 - I], [o.x1 - I, o.y0 + I, Ox1, o.y1 - I]];
-    for (const [a, b, c, e] of ring) R(a, b, c, e, { fill: '#f3f1eb' });
-    R(Ox0, Oy0, Ox1, Oy1, { stroke: INK, sw: W.OUTLINE });
-    R(o.x0 + I, o.y0 + I, o.x1 - I, o.y1 - I, { stroke: INK, sw: W.PROJ });
-    pt.text(X(Ox0) + 1, Y(Oy0) - 1, `ROOF LID +${lid.toFixed(2)} OVERHANG`, { size: 1.2, font: 'mono' });
+    const ring = top.inflate(lid).minus(top.erode(0.6));
+    for (const r of ring.rects()) R(r.x0, r.y0, r.x1, r.y1, { fill: '#f3f1eb' });
+    outline(top.inflate(lid), { stroke: INK, sw: W.OUTLINE });
+    outline(top.erode(0.6), { stroke: INK, sw: W.PROJ });
+    const bb = top.inflate(lid).bbox();
+    pt.text(X(bb.x0) + 1, Y(bb.y0) - 1, `ROOF LID +${lid.toFixed(2)} OVERHANG`, { size: 1.2, font: 'mono' });
   }
   // stair head-room
   R(sp.x - EXT_WALL / 2, sp.y - EXT_WALL / 2, sp.x + sp.w + EXT_WALL / 2, sp.y + sp.h + EXT_WALL / 2, { fill: '#dcd7cc', stroke: INK, sw: W.OUTLINE });
@@ -133,7 +148,7 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
   const ty = AREA.y1 - 3;
   pt.text(AREA.x0, ty, title, { size: TXT.title, weight: 600, spacing: 0.25 });
   pt.line(AREA.x0, ty + 1.2, AREA.x0 + 90, ty + 1.2, { stroke: INK, sw: W.PROJ });
-  pt.text(AREA.x0, ty + 4.4, `SITE ${s.width.toFixed(2)} × ${s.depth.toFixed(2)} m  ·  GROUND COVERAGE ${(((o.x1 - o.x0) * (o.y1 - o.y0)) / (s.width * s.depth) * 100).toFixed(1)}%  ·  BUILT-UP ${d.builtUp.toFixed(1)} m²  ·  LAT ${s.latitude.toFixed(1)}°`, { size: 1.8, font: 'mono' });
+  pt.text(AREA.x0, ty + 4.4, `SITE ${s.width.toFixed(2)} × ${s.depth.toFixed(2)} m  ·  GROUND COVERAGE ${(rg.reduce((u, r) => u.union(r), rg[0]).area() / (s.width * s.depth) * 100).toFixed(1)}%  ·  BUILT-UP ${d.builtUp.toFixed(1)} m²  ·  LAT ${s.latitude.toFixed(1)}°`, { size: 1.8, font: 'mono' });
   scaleBar(pt, AREA.x1 - 70, ty - 1, v.k, scale);
   northArrow(pt, AREA.x1 - 10, AREA.y0 + 12, s.northAngle, 7);
 }

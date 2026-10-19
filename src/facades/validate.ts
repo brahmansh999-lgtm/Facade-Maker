@@ -17,6 +17,11 @@ export function checkFacade(face: Face, out: FacadeOutput): FacadeIssue[] {
       const w = Math.min(b.u1, o.u1) - Math.max(b.u0, o.u0);
       const h = Math.min(b.z1, o.z1) - Math.max(b.z0, o.z0);
       if (w <= 0.005 || h <= 0.005 || w * h < 1e-4) continue;
+      // grazing an opening's edge (a frame member on the next zone's boundary) is not covering it
+      if (h <= 0.03 && (b.z1 <= o.z0 + 0.03 || b.z0 >= o.z1 - 0.03)) continue;
+      if (w <= 0.03 && (b.u1 <= o.u0 + 0.03 || b.u0 >= o.u1 - 0.03)) continue;
+      // a kerb-high edge of the terrace in front of a set-back door does not block it
+      if (b.d0 + (o.inset ?? 0) >= 1.0 && b.z1 <= o.z0 + 0.15) continue;
       // diagonal members: test the member itself, not its bounding box
       if (p.kind === 'bar' && !barHitsRect(p, { x0: o.u0 + 0.005, x1: o.u1 - 0.005, y0: o.z0 + 0.005, y1: o.z1 - 0.005 })) continue;
       if (p.kind === 'sweep' && !sweepHitsRect(p, { x0: o.u0 + 0.005, x1: o.u1 - 0.005, y0: o.z0 + 0.005, y1: o.z1 - 0.005 })) continue;

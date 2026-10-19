@@ -89,12 +89,20 @@ export interface OpeningOverride {
 
 /** push and pull of the volume, metres; 0 switches a move off */
 export interface Massing {
-  /** upper floors project forward over the ground floor (covered porch below) */
+  /** upper floors project forward over the ground floor; past 1.8 m the bay becomes a lounge on columns */
   cantilever: number;
+  /** which part cantilevers: the whole front, or the wing beside the stair (an L-shaped plan) */
+  span: 'full' | 'wing';
+  /** the wing's upper floors pull back from the rear by this much, leaving a terrace over the ground floor */
+  slide: number;
+  /** ground-floor entrance (hall and foyer) recessed under the floor above */
+  porch: number;
   /** top floor steps back from the rear, leaving a roof terrace */
   terrace: number;
   /** floating roof lid overhang beyond the top floor walls */
   lid: number;
+  /** columns under a long cantilever */
+  columns: boolean;
 }
 
 export interface Project {

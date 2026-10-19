@@ -9,7 +9,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 - Drawn the way an architect draws: flat tones and crisp outlines, no glossy rendering.
 - Orbit, pan and zoom; save the view as a PNG.
 
-- Push and pull the massing: upper floors cantilever over a covered porch, the top floor steps back for a roof terrace with glass balustrade and a terrace door, and a floating roof lid hovers over the parapet. Every drawing and the facade follow the steps.
+- A shaped, non-box plan: the upper wing beside the stair cantilevers 3 m over a covered porch (past 1.8 m it becomes a glazed lounge bay carried on columns that keep clear of the entrance path), slides back 1.5 m at the rear for a roof terrace with a glass door and balustrade, and the ground-floor entrance recesses under the floor above. Storey outlines are true rectilinear shapes (L-plans, notches, steps), so plans, elevations, section, roof plan, 3D, facade zones and the floating roof lid all follow them. Every move is adjustable or can be switched off.
 
 ### 2. Plans
 - Lays out the house automatically from the brief: floors, bedrooms, bathrooms, studies and parking.

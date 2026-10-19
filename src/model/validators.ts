@@ -4,6 +4,7 @@ import { EXT_WALL, INT_WALL } from './units.ts';
 import { HABITABLE } from '../geometry/openings.ts';
 import { area, overlap, roomRect, rw, rh, union } from '../geometry/rect.ts';
 import { gridLines } from '../geometry/faces.ts';
+import { Region } from '../geometry/region.ts';
 import { MAX_RISER, MIN_TREAD } from '../geometry/stair.ts';
 
 const f2 = (n: number) => n.toFixed(2);
@@ -53,7 +54,7 @@ export function validate(d: Derived): Warning[] {
       if (overlap(rs[i].b, rs[j].b) > 0.01) push({ code: 'overlap', severity: 'fail', level: lv, ref: rs[i].r.id, message: `${rs[i].r.name} overlaps ${rs[j].r.name}` });
     }
     const sum = rs.reduce((s, x) => s + area(x.b), 0);
-    const fpA = area(union(rs.map((x) => x.b)));
+    const fpA = Region.of(rs.map((x) => x.b)).area();
     if (sum < fpA - 0.05) push({ code: 'gap', severity: 'warn', level: lv, message: `L${lv}: ${f2(fpA - sum)} m² of the footprint is not assigned to a room` });
     // walls are generated to rule; this guards the derivation itself
     if (L.walls.some((w) => w.thickness !== (w.external ? EXT_WALL : INT_WALL))) push({ code: 'wall', severity: 'fail', level: lv, message: 'Wall thickness does not follow 230 ext. / 115 int.' });
@@ -90,8 +91,8 @@ export function validate(d: Derived): Warning[] {
 
   // ---- site
   const o = d.outlines[0] ?? d.outer, sb = p.site.setbacks;
-  // upper-floor projections (cantilevers, lids) may reach 1.5 m into a setback
-  const PROJ = 1.5;
+  // upper-floor projections (cantilevers, lids) may reach half the front setback, at most 3.0 m
+  const PROJ = Math.min(3.0, sb.front / 2);
   const up = d.outer;
   if (up.y0 < sb.front - PROJ - 1e-3) push({ code: 'setback', severity: 'fail', message: `Cantilever reaches ${f2(sb.front - up.y0)} m into the front setback (max ${PROJ})` });
   if (o.x0 < sb.left - 1e-3) push({ code: 'setback', severity: 'fail', message: `Left setback breached by ${f2(sb.left - o.x0)} m` });
