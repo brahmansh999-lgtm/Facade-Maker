@@ -13,6 +13,7 @@ import { ACCENT, INK, PAPER, mix, shade } from './color.ts';
 import { AREA, fitScale } from './sheet.ts';
 import { drawFurniture } from './furniturePlan.ts';
 import { Region, loopEdges } from '../geometry/region.ts';
+import { drawBoundary, drawGround, drawTrees, drawVerandah } from './siteworks.ts';
 import { TXT, bubble, chainDim, northArrow, runningDim, scaleBar, sectionMark } from './annot.ts';
 
 export const POCHE = '#2b2a27';
@@ -29,8 +30,10 @@ export const PLAN_MARGIN = 3.8;
 export function planLayout(d: Derived) {
   const s = d.project.site, sb = s.setbacks;
   const o = d.outer;
-  const b = { x0: Math.min(sb.left, o.x0), x1: Math.max(s.width - sb.right, o.x1), y0: Math.min(sb.front, o.y0), y1: Math.max(s.depth - sb.rear, o.y1) };
-  const wM = b.x1 - b.x0 + 2 * PLAN_MARGIN, hM = b.y1 - b.y0 + 2 * PLAN_MARGIN;
+  // the whole plot: the ground floor plan carries the boundary wall, verandah and garden
+  const b = { x0: Math.min(0, sb.left, o.x0), x1: Math.max(s.width, o.x1), y0: Math.min(0, o.y0), y1: Math.max(s.depth, o.y1) };
+  const m = 3.0;
+  const wM = b.x1 - b.x0 + 2 * Math.max(m, PLAN_MARGIN - Math.min(sb.left, sb.right)), hM = b.y1 - b.y0 + 2 * m;
   const scale = fitScale(wM, hM);
   const k = 1000 / scale;
   const cx = (AREA.x0 + AREA.x1) / 2, cy = (AREA.y0 + AREA.y1) / 2 - 2;
@@ -63,6 +66,10 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
   const rectM = (r: Rect, s: Parameters<Painter['rect']>[4]) => pt.rect(v.X(r.x0), v.Y(r.y1), rw(r) * v.k, rh(r) * v.k, s);
   const o = d.outer;
 
+  // ---- the plot: garden and paving, verandah (cut here, roof from above), boundary wall
+  if (li === 0) { drawGround(pt, d, v, false); drawVerandah(pt, d, v, 'cut'); drawBoundary(pt, d, v, false); }
+  else if (li === 1) drawVerandah(pt, d, v, 'below');
+
   // ---- room fills and wet-room tiling
   pt.begin('rooms');
   for (const r of lvl.rooms) {
@@ -94,14 +101,17 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
 
   // ---- grid
   const g = gridLines(d.project);
+  // annotation lines sit outside the plot (the plan carries the whole site)
+  const site = d.project.site;
+  const aL = Math.min(o.x0, 0), aF = Math.min(o.y0, 0), aR = Math.max(o.x1, site.width), aB = Math.max(o.y1, site.depth);
   pt.begin('grid');
   for (const x of g.xs) {
-    pt.line(v.X(x.v), v.Y(o.y0 - 2.8), v.X(x.v), v.Y(o.y1 + 0.6), { stroke: INK, sw: W.THIN, dash: [4, 0.8, 0.6, 0.8] });
-    bubble(pt, v.X(x.v), v.Y(o.y0 - 3.2), x.label);
+    pt.line(v.X(x.v), v.Y(aF - 2.0), v.X(x.v), v.Y(o.y1 + 0.6), { stroke: INK, sw: W.THIN, dash: [4, 0.8, 0.6, 0.8] });
+    bubble(pt, v.X(x.v), v.Y(aF - 2.4), x.label);
   }
   for (const y of g.ys) {
-    pt.line(v.X(o.x0 - 2.8), v.Y(y.v), v.X(o.x1 + 0.6), v.Y(y.v), { stroke: INK, sw: W.THIN, dash: [4, 0.8, 0.6, 0.8] });
-    bubble(pt, v.X(o.x0 - 3.2), v.Y(y.v), y.label);
+    pt.line(v.X(aL - 2.0), v.Y(y.v), v.X(o.x1 + 0.6), v.Y(y.v), { stroke: INK, sw: W.THIN, dash: [4, 0.8, 0.6, 0.8] });
+    bubble(pt, v.X(aL - 2.4), v.Y(y.v), y.label);
   }
   pt.end();
 
@@ -199,20 +209,22 @@ export function drawPlan(pt: Painter, d: Derived, li: number, v: View, opts: { f
     }
   }
 
+  if (li === 0) drawTrees(pt, d, v);
+
   // ---- dimensions
   const fy0 = v.Y(o.y0), fy1 = v.Y(o.y1), fx0 = v.X(o.x0), fx1 = v.X(o.x1);
   const gxs = g.xs.map((x) => x.v), gys = g.ys.map((y) => y.v);
   // front: grid chain, then overall (outer faces)
-  chainDim(pt, 'h', gxs.map(v.X), gxs, v.Y(o.y0 - 1.65), fy0);
-  chainDim(pt, 'h', [fx0, fx1], [o.x0, o.x1], v.Y(o.y0 - 2.35), fy0);
+  chainDim(pt, 'h', gxs.map(v.X), gxs, v.Y(aF - 0.7), fy0);
+  chainDim(pt, 'h', [fx0, fx1], [o.x0, o.x1], v.Y(aF - 1.35), fy0);
   // left: grid chain + overall
-  chainDim(pt, 'v', gys.map(v.Y), gys, v.X(o.x0 - 1.65), fx0);
-  chainDim(pt, 'v', [fy0, fy1], [o.y0, o.y1], v.X(o.x0 - 2.35), fx0);
+  chainDim(pt, 'v', gys.map(v.Y), gys, v.X(aL - 0.7), fx0);
+  chainDim(pt, 'v', [fy0, fy1], [o.y0, o.y1], v.X(aL - 1.35), fx0);
   // rear: running dims to every wall line; right: running dims along the depth
   const xsAll = [...new Set(lvl.rooms.flatMap((r) => [roomRect(r).x0, roomRect(r).x1]).map((x) => Math.round(x * 1000)))].sort((a, b) => a - b).map((x) => x / 1000);
   const ysAll = [...new Set(lvl.rooms.flatMap((r) => [roomRect(r).y0, roomRect(r).y1]).map((y) => Math.round(y * 1000)))].sort((a, b) => a - b).map((y) => y / 1000);
-  runningDim(pt, 'h', xsAll.map(v.X), xsAll, v.Y(o.y1 + 1.2), fy1);
-  runningDim(pt, 'v', ysAll.map(v.Y), ysAll, v.X(o.x1 + 1.2), fx1);
+  runningDim(pt, 'h', xsAll.map(v.X), xsAll, v.Y(aB + 0.8), fy1);
+  runningDim(pt, 'v', ysAll.map(v.Y), ysAll, v.X(aR + 0.8), fx1);
 
   // ---- section mark
   const sl = sectionLine(d);

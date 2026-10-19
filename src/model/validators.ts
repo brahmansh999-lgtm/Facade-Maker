@@ -99,6 +99,9 @@ export function validate(d: Derived): Warning[] {
   if (o.x1 > p.site.width - sb.right + 1e-3) push({ code: 'setback', severity: 'fail', message: `Right setback breached by ${f2(o.x1 - (p.site.width - sb.right))} m` });
   if (o.y0 < sb.front - 1e-3) push({ code: 'setback', severity: 'fail', message: `Front setback breached by ${f2(sb.front - o.y0)} m` });
   if (o.y1 > p.site.depth - sb.rear + 1e-3) push({ code: 'setback', severity: 'fail', message: `Rear setback breached by ${f2(o.y1 - (p.site.depth - sb.rear))} m` });
+  // the plot around the house: a usable backyard and real side margins
+  if (p.works?.garden && d.works.yardDepth < 3) push({ code: 'yard', severity: 'warn', message: `Backyard is only ${f2(Math.max(0, d.works.yardDepth))} m deep behind the ${d.works.verandah ? 'verandah' : 'house'} (aim for 3.00+)` });
+  if (p.works?.wall > 0 && Math.min(sb.left, sb.right) < 1.5) push({ code: 'setback', severity: 'warn', message: `Side setback ${f2(Math.min(sb.left, sb.right))} m leaves no usable path inside the boundary wall (aim for 1.50+)` });
   if (p.brief.parking > 0) {
     if (sb.front < 5.5) push({ code: 'parking', severity: 'warn', message: `Front setback ${f2(sb.front)} m is too short for a 5.0 m car bay + 0.5 m` });
     if (p.brief.parking * 2.7 > p.site.width - 1.0) push({ code: 'parking', severity: 'warn', message: `${p.brief.parking} car bays (2.7 m) do not fit the frontage` });

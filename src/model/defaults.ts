@@ -1,11 +1,11 @@
-import type { Brief, ElevationSetting, Massing, FaceKey, FacadeState, Project, Site, StairSpec } from './types.ts';
+import type { Brief, ElevationSetting, Massing, SiteWorksSpec, FaceKey, FacadeState, Project, Site, StairSpec } from './types.ts';
 import { solveLayout } from './layout.ts';
 import { FACADES, defaultParams, getFacade, hasFacade } from '../facades/registry.ts';
 
 export const DEFAULT_SITE: Site = {
-  width: 12,
-  depth: 24,
-  setbacks: { front: 6, rear: 2, left: 1.5, right: 1.5 },
+  width: 15,
+  depth: 30,
+  setbacks: { front: 6, rear: 6, left: 3, right: 3 },
   northAngle: 0,
   latitude: 28.6,
 };
@@ -22,6 +22,8 @@ export const DEFAULT_BRIEF: Brief = {
 };
 
 export const DEFAULT_MASSING: Massing = { cantilever: 3.0, span: 'wing', slide: 1.5, porch: 1.5, terrace: 0, lid: 0.6, columns: true };
+
+export const DEFAULT_WORKS: SiteWorksSpec = { wall: 1.8, verandah: 3.0, garden: true };
 
 export function defaultFacade(active = 'voronoi'): FacadeState {
   const t = getFacade(active);
@@ -48,6 +50,7 @@ export function defaultProject(): Project {
     facade: defaultFacade(),
     openingOverrides: {},
     massing: { ...DEFAULT_MASSING },
+    works: { ...DEFAULT_WORKS },
     unplaced: lay.unplaced,
   };
 }
@@ -82,6 +85,7 @@ export function normaliseProject(p: Project): Project {
   }
   p.openingOverrides ??= {};
   p.massing = { ...DEFAULT_MASSING, ...(p.massing ?? {}) };
+  p.works = { ...DEFAULT_WORKS, ...(p.works ?? {}) };
   p.unplaced ??= [];
   return p;
 }

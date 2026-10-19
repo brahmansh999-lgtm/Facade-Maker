@@ -95,7 +95,7 @@ export function deriveOpenings(
   let entranceHost: string | null = null;
   if (level.index === 0) {
     for (const t of ['corridor', 'foyer', 'living'] as RoomType[]) {
-      const host = level.rooms.find((r) => r.type === t && walls.some((w) => w.outside === 'front' && insideRoom(w) === r.id && wallLength(w) >= 1.2));
+      const host = level.rooms.find((r) => r.type === t && walls.some((w) => w.outside === 'front' && insideRoom(w) === r.id && wallLength(w) >= 1.2 - 1e-6));
       if (host) { entranceHost = host.id; break; }
     }
   }

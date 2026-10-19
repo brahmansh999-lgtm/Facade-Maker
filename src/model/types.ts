@@ -105,6 +105,16 @@ export interface Massing {
   columns: boolean;
 }
 
+/** what is built on the plot around the house */
+export interface SiteWorksSpec {
+  /** boundary wall height on the sides and rear (the front is kept to 1.2 m); 0 = none */
+  wall: number;
+  /** depth of the covered rear verandah; 0 = none */
+  verandah: number;
+  /** lawns, backyard sit-out, planting bed and trees */
+  garden: boolean;
+}
+
 export interface Project {
   version: 1;
   name: string;
@@ -116,6 +126,7 @@ export interface Project {
   facade: FacadeState;
   openingOverrides: Record<string, OpeningOverride>;
   massing: Massing;
+  works: SiteWorksSpec;
   /** Programme items the layout solver could not place. */
   unplaced: string[];
 }

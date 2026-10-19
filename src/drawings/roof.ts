@@ -10,6 +10,7 @@ import { AREA, fitScale } from './sheet.ts';
 import { TXT, bubble, chainDim, northArrow, scaleBar, sectionMark } from './annot.ts';
 import { sectionLine } from './plan.ts';
 import { Region, loopEdges } from '../geometry/region.ts';
+import { drawBoundary, drawGround, drawTrees, drawVerandah } from './siteworks.ts';
 
 export function roofLayout(d: Derived) {
   const s = d.project.site;
@@ -28,7 +29,7 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
   // site
   R(0, 0, s.width, s.depth, { stroke: INK, sw: W.PROJ, dash: [5, 1, 1, 1] });
   R(sb.left, sb.front, s.width - sb.right, s.depth - sb.rear, { stroke: INK, sw: W.THIN, dash: [1.5, 1] });
-  pt.text(X(s.width / 2), Y(0) + 6, 'ROAD', { size: TXT.label, anchor: 'middle', spacing: 0.6, weight: 500 });
+  pt.text(X(s.width * 0.22), Y(0) + 6, 'ROAD', { size: TXT.label, anchor: 'middle', spacing: 0.6, weight: 500 });
   pt.line(X(-2), Y(0) + 2, X(s.width + 2), Y(0) + 2, { stroke: INK, sw: W.BEYOND });
   pt.text(X(sb.left) + 1, Y(sb.front) - 1, `SETBACK LINE`, { size: 1.3, spacing: 0.2 });
   // setback dims
@@ -39,27 +40,9 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
   chainDim(pt, 'h', [X(0), X(s.width)], [0, s.width], Y(s.depth + 2.0), Y(s.depth));
   chainDim(pt, 'v', [Y(0), Y(s.depth)], [0, s.depth], X(-1.6), X(0));
 
-  // parking bays in the front setback
-  const n = p.brief.parking;
-  const bayW = 2.7, bayD = Math.min(5.0, sb.front - 0.3);
-  const ent = d.openings.find((o) => o.kind === 'entrance');
-  const avoid = ent ? ent.center : -99;
-  let x = s.width - sb.right - 0.2 - n * bayW;
-  if (avoid > x - 0.8 && avoid < s.width - sb.right) x = sb.left + 0.2;
-  for (let i = 0; i < n; i++) {
-    const bx = x + i * bayW;
-    R(bx, 0.15, bx + bayW, 0.15 + bayD, { stroke: INK, sw: W.BEYOND, fill: mix(PAPER, '#d8d3c7', 0.4) });
-    for (let t = 0.4; t < bayW + bayD; t += 0.5) {
-      const a = [bx + Math.min(t, bayW), 0.15 + Math.max(0, t - bayW)], b = [bx + Math.max(0, t - bayD), 0.15 + Math.min(t, bayD)];
-      pt.line(X(a[0]), Y(a[1]), X(b[0]), Y(b[1]), { stroke: INK, sw: W.THIN * 0.7 });
-    }
-    pt.rect(X(bx + bayW / 2) - 4, Y(0.15 + bayD / 2) - 2.2, 8, 3.4, { fill: PAPER });
-    pt.text(X(bx + bayW / 2), Y(0.15 + bayD / 2) + 0.4, `CAR ${i + 1}`, { size: 1.6, anchor: 'middle', font: 'mono' });
-  }
-  if (ent) {
-    // entrance path
-    R(ent.center - 0.6, 0, ent.center + 0.6, ent.c - EXT_WALL / 2 - 0.9, { stroke: INK, sw: W.BEYOND, dash: [1, 0.8] });
-  }
+  // garden, paving, car bays and the boundary wall
+  drawGround(pt, d, v);
+  drawBoundary(pt, d, v);
 
   const rg = d.regions, nl = rg.length;
   const outline = (r: Region, st: Parameters<Painter['poly']>[2]) => { for (const lp of r.loops()) pt.poly(lp.flatMap(([x, y]) => [X(x), Y(y)]), true, st); };
@@ -75,6 +58,7 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
     const t = deck.rects().sort((a, b) => (b.x1 - b.x0) * (b.y1 - b.y0) - (a.x1 - a.x0) * (a.y1 - a.y0))[0];
     if ((t.x1 - t.x0) * (t.y1 - t.y0) > 1) pt.text(X((t.x0 + t.x1) / 2), Y((t.y0 + t.y1) / 2) + 0.5, `TERRACE L${i}`, { size: 1.5, anchor: 'middle', weight: 600, spacing: 0.15 });
   }
+  drawVerandah(pt, d, v, 'roof');
   // building roof (top storey)
   const top = rg[nl - 1];
   const o = top.bbox();
@@ -135,11 +119,15 @@ export function drawRoof(pt: Painter, d: Derived, v: View, title: string, scale:
       pt.poly(pts, true, { fill: mix(p0.fill, PAPER, 0.3), stroke: INK, sw: W.THIN });
     }
   }
+  drawTrees(pt, d, v);
+
   // grid
   const g = gridLines(p);
-  for (const gx of g.xs) bubble(pt, X(gx.v), Y(o.y1 + 1.6), gx.label, 2.4);
+  // bubbles beyond the verandah and its steps, on the lawn
+  const yb = Math.max(o.y1, d.works.verandah?.steps.y1 ?? o.y1);
+  for (const gx of g.xs) bubble(pt, X(gx.v), Y(yb + 1.6), gx.label, 2.4);
   for (const gy of g.ys) bubble(pt, X(o.x0 - 1.4), Y(gy.v), gy.label, 2.4);
-  for (const gx of g.xs) pt.line(X(gx.v), Y(o.y1 + 1.25), X(gx.v), Y(o.y1), { stroke: INK, sw: W.THIN, dash: [3, 0.8] });
+  for (const gx of g.xs) pt.line(X(gx.v), Y(yb + 1.25), X(gx.v), Y(o.y1), { stroke: INK, sw: W.THIN, dash: [3, 0.8] });
   for (const gy of g.ys) pt.line(X(o.x0 - 1.05), Y(gy.v), X(o.x0), Y(gy.v), { stroke: INK, sw: W.THIN, dash: [3, 0.8] });
 
   const sl = sectionLine(d);

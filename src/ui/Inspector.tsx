@@ -253,6 +253,16 @@ export function Inspector() {
       </section>
 
       <section>
+        <h2><span className="sc">Site works</span><span className="mono dim">wall · verandah · garden</span></h2>
+        <div className="body">
+          <div className="field"><span>Boundary wall height</span><Stepper value={p.works.wall} step={0.15} min={0} max={2.4} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, works: { ...pp.works, wall: n } }), 'works-w')} /></div>
+          <div className="field"><span>Rear verandah depth</span><Stepper value={p.works.verandah} step={0.15} min={0} max={4.5} fmt={(n) => (n * 1000).toFixed(0)} onChange={(n) => commit((pp) => ({ ...pp, works: { ...pp.works, verandah: n } }), 'works-v')} /></div>
+          <div className="field"><span>Garden &amp; backyard</span><input type="checkbox" checked={p.works.garden} onChange={(e) => commit((pp) => ({ ...pp, works: { ...pp.works, garden: e.target.checked } }))} /></div>
+          <p className="note">Boundary wall on the plot line (front kept to 1200 with a sliding car gate and a pedestrian gate); a covered verandah on slim columns off the living spaces; lawns, a backyard sit-out, planting bed and trees. Backyard {d.works.yardDepth.toFixed(1)} m deep.</p>
+        </div>
+      </section>
+
+      <section>
         <h2 className="collapse" onClick={() => setUI({ briefOpen: !ui.briefOpen })}><span className="sc">{ui.briefOpen ? '▾' : '▸'} Brief &amp; site</span><span className="mono dim">{p.brief.floors}F · {p.brief.bedrooms}BR</span></h2>
         {ui.briefOpen && (
           <div className="body">

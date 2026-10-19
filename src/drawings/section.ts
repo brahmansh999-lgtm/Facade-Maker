@@ -27,7 +27,9 @@ export function sectionGeom(d: Derived) {
   const right: [number, number] = [vd[1], -vd[0]];
   const sign = axisY ? right[1] : right[0];
   const H = (along: number) => sign * along;
-  const o = d.outer;
+  // the verandah (and its steps) extends the cut past the rear wall
+  const vr = d.works.verandah;
+  const o = vr ? { x0: d.outer.x0, y0: d.outer.y0, x1: Math.max(d.outer.x1, vr.canopy.x1), y1: Math.max(d.outer.y1, vr.steps.y1) } : d.outer;
   return { st, axisY, A, C, cut, cp, H, sign, a0: A(o.x0, o.y0), a1: A(o.x1, o.y1), sOrigin: A(st.rect.x0, st.rect.y0) };
 }
 
@@ -68,7 +70,8 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
   const hole: [number, number] = [s0 + st.holeS[0], s0 + st.holeS[1]];
 
   // ground, plinth fill, footings
-  const xl = Math.min(X(lo - 2.5), X(hi + 2.5)), xr = Math.max(X(lo - 2.5), X(hi + 2.5));
+  const gLo = Math.min(lo, g.a0, g.a1), gHi = Math.max(hi, g.a0, g.a1);
+  const xl = Math.min(X(gLo - 2.5), X(gHi + 2.5)), xr = Math.max(X(gLo - 2.5), X(gHi + 2.5));
   pt.line(xl, Y(0), xr, Y(0), { stroke: INK, sw: W.CUT * 1.2 });
   earthHatch(pt, xl, xr, Y(0), 1.4);
   R(lo, 0, hi, ffls[0] - 0.1, { fill: mix(PAPER, '#c9c2b2', 0.5), stroke: INK, sw: W.BEYOND });
@@ -124,6 +127,28 @@ export function drawSection(pt: Painter, d: Derived, v: View) {
       R(edge - 0.03, z + 0.95, edge + 0.03, z + 1.0, poche);
     }
   }
+  // rear verandah: deck and canopy cut where the section crosses them, columns beyond
+  const vr = d.works.verandah;
+  if (vr && C(vr.deck.x0, vr.deck.y0) < cut && C(vr.deck.x1, vr.deck.y1) > cut) {
+    const top = p.brief.plinth - 0.03;
+    const span = (r: { x0: number; y0: number; x1: number; y1: number }): [number, number] => [A(r.x0, r.y0), A(r.x1, r.y1)];
+    const [da, db] = span(vr.deck), [ca, cb] = span(vr.canopy);
+    R(da, 0, db, top - 0.1, { fill: mix(PAPER, '#c9c2b2', 0.5), stroke: INK, sw: W.BEYOND });
+    R(da, top - 0.1, db, top, poche);
+    R(ca, vr.zc0, cb, vr.zc1, poche);
+    for (const c of vr.cols) {
+      const a = A(c.x, c.y);
+      R(a - c.s / 2, top, a + c.s / 2, vr.zc0, { stroke: INK, sw: W.BEYOND });
+    }
+    if (C(vr.steps.x0, vr.steps.y0) < cut && C(vr.steps.x1, vr.steps.y1) > cut) {
+      for (let i = 0; i < vr.nSteps; i++) {
+        const a = A(vr.steps.x0, vr.steps.y0 + i * 0.3), b = A(vr.steps.x0, vr.steps.y0 + (i + 1) * 0.3);
+        R(a, 0, b, top - ((i + 1) * top) / (vr.nSteps + 1), poche);
+      }
+    }
+    pt.text(X((da + db) / 2), Y(top + 1.2), 'VERANDAH', { size: TXT.small, anchor: 'middle', spacing: 0.2 });
+  }
+
   // floating roof lid on its shadow gap
   const lid = p.massing?.lid ?? 0;
   if (lid > 0) {

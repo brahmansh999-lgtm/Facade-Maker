@@ -26,9 +26,25 @@ export interface ElevOpts {
   simple?: boolean;
 }
 
+/** the rear verandah seen on this face: its u-range and how far it stands in front of the face plane */
+export function verandahOn(d: Derived, side: Side) {
+  const vr = d.works.verandah;
+  if (!vr || side === 'front') return null;
+  const f = d.faces[side].face;
+  const c = vr.canopy;
+  const us = [toU(f, c.x0, c.y0), toU(f, c.x1, c.y1)], ds = [toD(f, c.x0, c.y0), toD(f, c.x1, c.y1), toD(f, c.x0, c.y1), toD(f, c.x1, c.y0)];
+  return { u0: Math.min(...us), u1: Math.max(...us), d: Math.max(...ds) };
+}
+
+/** horizontal span of the drawing on this face: the house plus anything projecting past it */
+export function elevSpan(d: Derived, side: Side) {
+  const f = d.faces[side].face, vu = verandahOn(d, side);
+  return { lo: Math.min(0, vu?.u0 ?? 0), hi: Math.max(f.width, vu?.u1 ?? f.width) };
+}
+
 /** extents in model metres the elevation needs around the face (for layout) */
-export function elevExtents(face: Face) {
-  return { w: face.width + 7.5, h: Math.max(face.parapetTop, face.mumty?.z1 ?? 0) + 4.2 };
+export function elevExtents(face: Face, extra = 0) {
+  return { w: face.width + extra + 7.5, h: Math.max(face.parapetTop, face.mumty?.z1 ?? 0) + 4.2 };
 }
 
 export function elevationTitle(d: Derived, side: Side) {
@@ -46,8 +62,9 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
   const lineW = o.simple ? 0.18 : W.OUTLINE;
 
   // ground
-  pt.line(X(-2.2), Y(0), X(f.width + 2.2), Y(0), { stroke: INK, sw: W.CUT * 1.2 });
-  if (!o.simple) earthHatch(pt, X(-2.2), X(f.width + 2.2), Y(0), 1.4);
+  const { lo, hi } = elevSpan(d, side);
+  pt.line(X(lo - 2.2), Y(0), X(hi + 2.2), Y(0), { stroke: INK, sw: W.CUT * 1.2 });
+  if (!o.simple) earthHatch(pt, X(lo - 2.2), X(hi + 2.2), Y(0), 1.4);
 
   // stair head-room beyond the parapet
   if (f.mumty) {
@@ -135,6 +152,32 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
     R(ua - lid, zt, ub + lid, zt + 0.04, { fill: INK, opacity: 0.18 });
   }
 
+  // the rear verandah: in front on the rear face, in profile on the sides
+  const vr = d.works.verandah, vu = verandahOn(d, side);
+  if (vr && vu) {
+    const top = d.project.brief.plinth - 0.03;
+    const du = [toU(f, vr.deck.x0, vr.deck.y0), toU(f, vr.deck.x1, vr.deck.y1)];
+    // shade of the covered space under the canopy
+    if (side === 'rear') R(vu.u0 + 0.1, top, vu.u1 - 0.1, vr.zc0, { fill: INK, opacity: 0.09 });
+    R(Math.min(...du), 0, Math.max(...du), top, { fill: '#e2d6bd', stroke: INK, sw: W.PROJ });
+    const su = [toU(f, vr.steps.x0, vr.steps.y0), toU(f, vr.steps.x1, vr.steps.y1)];
+    for (let i = 0; i < vr.nSteps; i++) {
+      const h = top - ((i + 1) * top) / (vr.nSteps + 1);
+      if (side === 'rear') R(Math.min(...su), 0, Math.max(...su), h, { fill: shade(WALL_TONE, 0.12), stroke: INK, sw: W.BEYOND });
+      else {
+        const a = toU(f, vr.steps.x0, vr.steps.y0 + i * 0.3), b = toU(f, vr.steps.x0, vr.steps.y0 + (i + 1) * 0.3);
+        R(Math.min(a, b), 0, Math.max(a, b), h, { fill: shade(WALL_TONE, 0.12), stroke: INK, sw: W.BEYOND });
+      }
+    }
+    for (const c of vr.cols) {
+      const u = toU(f, c.x, c.y);
+      if (u < vu.u0 - 0.01 || u > vu.u1 + 0.01) continue;
+      R(u - c.s / 2, top, u + c.s / 2, vr.zc0, { fill: shade(INK, -0.35), stroke: INK, sw: W.BEYOND });
+    }
+    R(vu.u0, vr.zc0 - 0.12, vu.u1, vr.zc0, { fill: INK, opacity: 0.12 });
+    R(vu.u0, vr.zc0, vu.u1, vr.zc1, { fill: '#ece9e1', stroke: INK, sw: W.PROJ });
+  }
+
   // silhouette of the whole mass on this face
   const sil = Region.of([
     ...zones.map((z) => ({ x0: z.u0, y0: z.z0, x1: z.u1, y1: z.z1 })),
@@ -167,15 +210,15 @@ export function drawElevation(pt: Painter, d: Derived, side: Side, v: View, o: E
     const zs = [0, f.plinthTop, ...f.levels.slice(1).map((l) => l.ffl), f.roofZ, f.parapetTop];
     if (f.mumty) zs.push(f.mumty.z1);
     const zz = [...new Set(zs.map((z) => Math.round(z * 1000)))].sort((a, b) => a - b).map((z) => z / 1000);
-    chainDim(pt, 'v', zz.map(Y), zz, X(-1.4), X(0));
+    chainDim(pt, 'v', zz.map(Y), zz, X(lo - 1.4), X(lo));
     // opening heights on the right: sill / head of the first window on each level
     const byLevel = new Map<number, number[]>();
     for (const op of f.openings) if (!op.door) byLevel.set(op.levelIndex, [...(byLevel.get(op.levelIndex) ?? []), op.z0, op.z1]);
     const oz = [...new Set([...byLevel.values()].flat().map((z) => Math.round(z * 1000)))].sort((a, b) => a - b).map((z) => z / 1000);
-    if (oz.length >= 2) chainDim(pt, 'v', oz.map(Y), oz, X(f.width + 0.9), X(f.width));
+    if (oz.length >= 2) chainDim(pt, 'v', oz.map(Y), oz, X(hi + 0.9), X(hi));
   }
   if (o.datums !== false && !o.simple) {
-    const xr = X(f.width + 2.0);
+    const xr = X(hi + 2.0);
     levelMark(pt, xr, Y(0), '±0.000', 'right', 'NGL');
     f.levels.forEach((l, i) => levelMark(pt, xr, Y(l.ffl), levelText(l.ffl), 'right', i === 0 ? 'FFL GROUND' : `FFL LEVEL ${i}`));
     levelMark(pt, xr, Y(f.roofZ), levelText(f.roofZ), 'right', 'TOS ROOF');

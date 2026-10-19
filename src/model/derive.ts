@@ -13,7 +13,8 @@ import { checkFacade, type FacadeIssue } from '../facades/validate.ts';
 import { validate } from './validators.ts';
 import { furnishRoom, type Furn } from '../geometry/furniture.ts';
 import { BAY, applyMassing, levelRegion } from '../geometry/massing.ts';
-import type { Region } from '../geometry/region.ts';
+import { Region } from '../geometry/region.ts';
+import { siteWorks, verandahDeck, type SiteWorks } from '../geometry/sitework.ts';
 import { isPlanar, runZoned } from '../facades/zones.ts';
 import { EXT_WALL, SLAB } from './units.ts';
 
@@ -42,6 +43,8 @@ export interface Derived {
   outlines: Rect[];
   /** free-standing columns under a long cantilever: plan centre, side, top */
   columns: Column[];
+  /** boundary wall, gates, paving, verandah, lawns and trees */
+  works: SiteWorks;
   levels: LevelDerived[];
   openings: Opening[];
   stair: StairCalc;
@@ -61,7 +64,7 @@ export function syncStair(p: Project): Level[] {
 /** a storey that steps back over the one below gets a glazed door out onto that terrace */
 function terraceDoor(level: Level, openings: Opening[], below: Region | undefined) {
   if (!below) return;
-  const rank: Record<string, number> = { family: 3, living: 3, bedroom: 2, study: 1 };
+  const rank: Record<string, number> = { family: 3, living: 3, dining: 3, bedroom: 2, study: 1 };
   const type = (o: Opening) => level.rooms.find((r) => r.id === o.roomId)?.type ?? '';
   const outside = (o: Opening): [number, number] => {
     const d = o.side === 'front' || o.side === 'left' ? -0.6 : 0.6;
@@ -161,7 +164,9 @@ export function derive(p0: Project): Derived {
   const levels: LevelDerived[] = p.levels.map((level, li) => {
     const walls = deriveWalls(level);
     const openings = deriveOpenings(level, walls, keyFor, p.site.latitude, p.openingOverrides);
-    terraceDoor(level, openings, regions[li - 1]);
+    // a door out onto the terrace below, or on the ground floor onto the verandah
+    const deck = li === 0 ? verandahDeck(p, regions[0]) : null;
+    terraceDoor(level, openings, li === 0 ? (deck ? Region.of([deck]) : undefined) : regions[li - 1]);
     const clear = new Map(level.rooms.map((r) => [r.id, clearRect(r, walls)]));
     const furniture = level.rooms.flatMap((r) => furnishRoom(r, clear.get(r.id)!, openings));
     return { level, walls, openings, clear, furniture };
@@ -193,8 +198,11 @@ export function derive(p0: Project): Derived {
   const o = outerRect(fp);
   const outlines = regions.map((r) => r.bbox());
   const columns = cantileverColumns(p, regions, levels[0]?.openings.find((x) => x.kind === 'entrance'));
+  const ent = levels[0]?.openings.find((x) => x.kind === 'entrance');
+  const garden = levels[0]?.openings.filter((x) => x.kind === 'garden' && x.side === 'rear').sort((a, b) => (a.roomId.includes('cor') ? -1 : 1) - (b.roomId.includes('cor') ? -1 : 1))[0];
+  const works = siteWorks(p, regions, ent, garden);
   const builtUp = regions.reduce((sum, r) => sum + r.area(), 0) + (stair ? (sp.w + 0.23) * (sp.h + 0.23) : 0);
-  const d: Derived = { project: p, footprint: fp, outer: o, regions, outlines, columns, levels, openings, stair, faces, sun, warnings: [], builtUp };
+  const d: Derived = { project: p, footprint: fp, outer: o, regions, outlines, columns, works, levels, openings, stair, faces, sun, warnings: [], builtUp };
   d.warnings = validate(d);
   return d;
 }

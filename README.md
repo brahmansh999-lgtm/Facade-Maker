@@ -10,6 +10,7 @@ A browser-based design tool for houses, built around the facade. Set a brief and
 - Orbit, pan and zoom; save the view as a PNG.
 
 - A shaped, non-box plan: the upper wing beside the stair cantilevers 3 m over a covered porch (past 1.8 m it becomes a glazed lounge bay carried on columns that keep clear of the entrance path), slides back 1.5 m at the rear for a roof terrace with a glass door and balustrade, and the ground-floor entrance recesses under the floor above. Storey outlines are true rectilinear shapes (L-plans, notches, steps), so plans, elevations, section, roof plan, 3D, facade zones and the floating roof lid all follow them. Every move is adjustable or can be switched off.
+- Site works on a 15 × 30 m plot with real setbacks all round (front 6, sides 3, rear 6): a boundary wall on the plot line (1.2 m at the front with a sliding car gate and a pedestrian gate on the entrance path), a 3 m covered rear verandah on slim columns with steps to the garden and French doors from the dining room, and a backyard with lawn, a paved sit-out, planting bed and trees. Shown on the ground floor plan, site plan, rear and side elevations, section and 3D; all adjustable under Site works.
 
 ### 2. Plans
 - Lays out the house automatically from the brief: floors, bedrooms, bathrooms, studies and parking.

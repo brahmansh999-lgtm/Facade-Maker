@@ -8,7 +8,7 @@ import { View, W, type Painter } from './painter.ts';
 import { INK } from './color.ts';
 import { AREA, fitScale, sheetSVG, type SheetMeta } from './sheet.ts';
 import { drawPlan, planLayout } from './plan.ts';
-import { drawElevation, elevExtents, elevationTitle } from './elevation.ts';
+import { drawElevation, elevExtents, elevSpan, elevationTitle } from './elevation.ts';
 import { drawSection, sectionGeom, sectionLayout } from './section.ts';
 import { drawRoof, roofLayout } from './roof.ts';
 import { TXT, scaleBar } from './annot.ts';
@@ -27,11 +27,12 @@ export function sheetList(d: Derived): SheetDef[] {
 
 export function elevLayout(d: Derived, side: Side) {
   const f = d.faces[side].face;
-  const e = elevExtents(f);
+  const { lo, hi } = elevSpan(d, side);
+  const e = elevExtents(f, hi - lo - f.width);
   const scale = fitScale(e.w, e.h);
   const k = 1000 / scale;
   const cx = (AREA.x0 + AREA.x1) / 2, cy = (AREA.y0 + AREA.y1) / 2;
-  return { view: new View(cx - (f.width / 2 + 1.0) * k, cy + (e.h / 2 - 3.0) * k, k), scale };
+  return { view: new View(cx - ((lo + hi) / 2 + 1.0) * k, cy + (e.h / 2 - 3.0) * k, k), scale };
 }
 
 /** sheet-mm rectangles framing just the drawing, for the default on-screen view */
@@ -41,7 +42,8 @@ export function drawingFocus(d: Derived, id: string) {
     const side = id.slice(5) as Side;
     const f = d.faces[side].face;
     const v = elevLayout(d, side).view;
-    return rect(v.X(-2.6), v.Y(Math.max(f.parapetTop, f.mumty?.z1 ?? 0) + 1.8), v.X(f.width + 4.6), v.Y(-3.0));
+    const { lo, hi } = elevSpan(d, side);
+    return rect(v.X(lo - 2.6), v.Y(Math.max(f.parapetTop, f.mumty?.z1 ?? 0) + 1.8), v.X(hi + 4.6), v.Y(-3.0));
   }
   if (id.startsWith('plan-')) {
     const v = planLayout(d).view, o = d.outer;
